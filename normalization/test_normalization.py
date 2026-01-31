@@ -3,9 +3,9 @@ from ingestion.news import fetch_rss_feed
 from normalization.normalize import normalize_noaa_record, normalize_news_record
 
 
-def test_normalization():
+def test_normalization(state: str = "KY"):
     print("=== NOAA NORMALIZATION ===")
-    noaa_records = fetch_active_alerts("KY")
+    noaa_records = fetch_active_alerts(state)
 
     if noaa_records:
         normalized = normalize_noaa_record(noaa_records[0])
@@ -19,7 +19,7 @@ def test_normalization():
         normalized_news = normalize_news_record(news_records[0])
         print(normalized_news)
     else:
-        print("No news records to normalize (valid state).")
+        print(f"No news records to normalize {state}.")
 
 
 if __name__ == "__main__":

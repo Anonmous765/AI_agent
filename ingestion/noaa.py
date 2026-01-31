@@ -35,3 +35,6 @@ def fetch_active_alerts(area="KY"):
         })
 
     return records
+
+if __name__ == "__main__":
+    print(fetch_active_alerts())

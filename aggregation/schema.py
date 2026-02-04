@@ -12,3 +12,4 @@ class CountyAggregate:
     total_signals: int
     severe_count: int
     latest_timestamp: datetime
+

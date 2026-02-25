@@ -81,9 +81,9 @@ DISASTER_KEYWORDS = {
     "emergency": 4,
 }
 
-def rss_filter(feed: feedparser.FeedParserDict) -> tuple[list[feedparser.FeedParserDict], int] | None:
+def rss_filter(feed: feedparser.FeedParserDict) -> list[feedparser.FeedParserDict] | None:
     articles = feed["entries"]
-    disaster_keywords = []
+    disaster_articles = []
     pattern = re.compile(
         r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
         r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency)\b",
@@ -91,5 +91,7 @@ def rss_filter(feed: feedparser.FeedParserDict) -> tuple[list[feedparser.FeedPar
     )
 
     for article in articles:
-        for keyword in DISASTER_KEYWORDS.keys():
-            pass
+        if re.search(pattern, article.get("summary", "") or re.search(pattern, article.get("title", "")):
+            disaster_articles.append(article)
+
+    return disaster_articles if len(articles) > 0 else None

@@ -1,5 +1,5 @@
 from datetime import datetime
-from normalization.schema import NormalizedSignal
+from normalization.schema import NormalizedSignal_noaa
 
 
 # Source reliability weights
@@ -24,7 +24,7 @@ def parse_timestamp(ts: str) -> datetime:
         return datetime.utcnow()
 
 
-def normalize_noaa_record(record: dict) -> list[NormalizedSignal]:
+def normalize_noaa_record(record: dict) -> list[NormalizedSignal_noaa]:
     """
     Convert a single NOAA ingestion record into one or more NormalizedSignals.
     NOAA alerts may apply to multiple counties.
@@ -39,7 +39,7 @@ def normalize_noaa_record(record: dict) -> list[NormalizedSignal]:
 
     for county in counties.split(";"):
         signals.append(
-            NormalizedSignal(
+            NormalizedSignal_noaa(
                 source="NOAA",
                 county=county.strip(),
                 signal_type=metadata.get("event", "Weather Alert"),
@@ -53,14 +53,14 @@ def normalize_noaa_record(record: dict) -> list[NormalizedSignal]:
     return signals
 
 
-def normalize_news_record(record: dict) -> NormalizedSignal:
+def normalize_news_record(record: dict) -> NormalizedSignal_noaa:
     """
     Convert a news ingestion record into a NormalizedSignal.
     County extraction is deferred or coarse at this stage.
     """
     source = record.get("source", "Unknown")
 
-    return NormalizedSignal(
+    return NormalizedSignal_noaa(
         source=source,
         county="Unknown",  # refined later (NER / rules)
         signal_type="News Report",

@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+ingestion/test.ipynb
 
 # Environment
 .env

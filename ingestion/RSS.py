@@ -3,6 +3,7 @@ import requests
 import apscheduler
 from normalization.schema import RssNormalizedSignal
 import re
+from datetime import datetime
 
 RSS_FEEDS = {
     "central_kentucky": {
@@ -81,17 +82,46 @@ DISASTER_KEYWORDS = {
     "emergency": 4,
 }
 
-def rss_filter(feed: feedparser.FeedParserDict) -> list[feedparser.FeedParserDict] | None:
+def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | None:
     articles = feed["entries"]
     disaster_articles = []
     pattern = re.compile(
+        
         r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
-        r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency)\b",
+        r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency|war|military)\b",
         re.IGNORECASE
     )
 
     for article in articles:
-        if re.search(pattern, article.get("summary", "") or re.search(pattern, article.get("title", "")):
-            disaster_articles.append(article)
+        title = article.get("title") or ""
+        summary = article.get("summary") or ""
+        text = f"{title} {summary}".strip()
+        if not re.search(pattern, text):
+            continue
+
+        matches = [match.group(0).lower() for match in pattern.finditer(text)]
+        keywords = list(dict.fromkeys(matches))
+        severity = max((DISASTER_KEYWORDS.get(keyword, 0) for keyword in keywords), default=0)
+        published = article.get("published_parsed") or article.get("updated_parsed")
+        timestamp = datetime(*published[:6]) if published else datetime.utcnow()
+        author = article.get("author", "None found")
+        source = feed.get("feed", {}).get("title") or feed.get("href", "Unknown")
+
+        disaster_articles.append(RssNormalizedSignal(
+            source=source,
+            author=author,
+            signal_type="News Report",
+            title=title,
+            link=article.get("link", "None found"),
+            severity=severity,
+            timestamp=timestamp,
+            keywords=keywords,
+            confidence=0.6,
+            raw_text=text,
+        ))
 
     return disaster_articles if len(articles) > 0 else None
+
+
+
+# Used the bozo argument to check if the parse was successful. Include logic that means whether or not

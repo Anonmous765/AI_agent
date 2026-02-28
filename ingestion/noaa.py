@@ -3,7 +3,7 @@ from datetime import datetime
 
 BASE_URL = "https://api.weather.gov"
 HEADERS = {
-    "User-Agent": "KY-Damage-Agent/1.0 (contact@example.com)",
+    "User-Agent": "KY-Damage-Agent/1.0 (vedansh.kakkar@gmail.com)",
     "Accept": "application/geo+json"
 }
 

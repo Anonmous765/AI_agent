@@ -22,6 +22,7 @@ class NoaaNormalizedSignal:
 class RssNormalizedSignal:
     source: str
     author: str
+    signal_type: str
     title: str
     link: str
     severity: int

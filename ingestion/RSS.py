@@ -88,7 +88,7 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
     pattern = re.compile(
         
         r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
-        r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency|war|military)\b",
+        r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency)\b",
         re.IGNORECASE
     )
 
@@ -122,6 +122,10 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
 
     return disaster_articles if len(articles) > 0 else None
 
+if __name__ == "__main__":
+    for x in RSS_FEEDS.values():
+        for y in x.items():
+            print(y[1]['url'])
+            print(rss_filter(feedparser.parse(y[1]['url'])))
 
 
-# Used the bozo argument to check if the parse was successful. Include logic that means whether or not

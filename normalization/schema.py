@@ -25,8 +25,7 @@ class RssNormalizedSignal:
     signal_type: str
     title: str
     link: str
-    severity: int
     timestamp: datetime
     keywords: list[str]
-    confidence: float
     raw_text: str
+

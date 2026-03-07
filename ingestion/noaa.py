@@ -7,6 +7,7 @@ HEADERS = {
     "Accept": "application/geo+json"
 }
 
+# Implement the Normalization into the function instead of separating it
 def fetch_active_alerts(area="KY"):
     """
     Fetch active weather alerts for a given area (e.g., KY).

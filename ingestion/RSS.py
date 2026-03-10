@@ -104,7 +104,7 @@ def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
         published = article.get("published_parsed") or article.get("updated_parsed")
         timestamp = datetime(*published[:6]) if published else datetime.utcnow()
         author = article.get("author", "None found")
-        source = feed.get("feed", {}).get("title") or feed.get("href", "Unknown")
+        source = feed.get("feed", "News Agency").get("title") or feed.get("href", "News Agency")
 
         disaster_article = RssNormalizedSignal(
             source=source,

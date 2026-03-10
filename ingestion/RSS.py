@@ -1,3 +1,10 @@
+"""
+RSS ingestion utilities and feed catalog for Kentucky-area news sources.
+
+This module maintains a list of local RSS feeds and provides a basic
+keyword-based filter for extracting disaster-relevant articles.
+"""
+
 import feedparser
 import requests
 import apscheduler
@@ -83,6 +90,15 @@ DISASTER_KEYWORDS = {
 }
 
 def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
+    """Return the most recent disaster-related article from a feed.
+
+    Args:
+        feed: Parsed RSS feed from `feedparser.parse`.
+
+    Returns:
+        A normalized signal for the last matching article in the feed,
+        or None when no entries contain disaster keywords.
+    """
     articles = feed["entries"]
     disaster_article = None
     pattern = re.compile(
@@ -125,5 +141,4 @@ if __name__ == "__main__":
         for y in x.items():
             print(y[1]['url'])
             print(rss_filter(feedparser.parse(y[1]['url'])))
-
 

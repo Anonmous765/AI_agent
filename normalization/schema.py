@@ -1,3 +1,9 @@
+"""
+Shared dataclass schemas for normalized signals.
+
+Normalization produces these canonical structures for downstream processing.
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -20,6 +26,8 @@ class NoaaNormalizedSignal:
 
 @dataclass
 class RssNormalizedSignal:
+    """Normalized representation of a news-based signal."""
+
     source: str
     author: str
     signal_type: str
@@ -28,4 +36,3 @@ class RssNormalizedSignal:
     timestamp: datetime
     keywords: list[str]
     raw_text: str
-

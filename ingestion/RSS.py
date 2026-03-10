@@ -82,9 +82,9 @@ DISASTER_KEYWORDS = {
     "emergency": 4,
 }
 
-def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | None:
+def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
     articles = feed["entries"]
-    disaster_articles = []
+    disaster_article = None
     pattern = re.compile(
         
         r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
@@ -106,7 +106,7 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
         author = article.get("author", "None found")
         source = feed.get("feed", {}).get("title") or feed.get("href", "Unknown")
 
-        disaster_articles.append(RssNormalizedSignal(
+        disaster_article = RssNormalizedSignal(
             source=source,
             author=author,
             signal_type="News Report",
@@ -115,9 +115,10 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
             timestamp=timestamp,
             keywords=keywords,
             raw_text=text,
-        ))
+        )
 
-    return disaster_articles if len(articles) > 0 else None
+    return disaster_article
+
 
 if __name__ == "__main__":
     for x in RSS_FEEDS.values():

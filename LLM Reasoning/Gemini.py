@@ -12,7 +12,10 @@ from ingestion.RSS import RSS_FEEDS
 from normalization.schema import RssNormalizedSignal
 
 load_dotenv()
-
+"""
+TODO:
+Implement the RSS filter function into the 
+"""
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )

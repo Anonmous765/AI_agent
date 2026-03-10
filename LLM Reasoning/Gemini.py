@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from google import genai
 
 from ingestion.noaa import fetch_active_alerts
-from ingestion.RSS import RSS_FEEDS
+from ingestion.RSS import RSS_FEEDS, rss_filter
 from normalization.schema import RssNormalizedSignal
 
 load_dotenv()

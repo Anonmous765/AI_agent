@@ -101,7 +101,6 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
 
         matches = [match.group(0).lower() for match in pattern.finditer(text)]
         keywords = list(dict.fromkeys(matches))
-        severity = max((DISASTER_KEYWORDS.get(keyword, 0) for keyword in keywords), default=0)
         published = article.get("published_parsed") or article.get("updated_parsed")
         timestamp = datetime(*published[:6]) if published else datetime.utcnow()
         author = article.get("author", "None found")
@@ -113,10 +112,8 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
             signal_type="News Report",
             title=title,
             link=article.get("link", "None found"),
-            severity=severity,
             timestamp=timestamp,
             keywords=keywords,
-            confidence=0.6,
             raw_text=text,
         ))
 

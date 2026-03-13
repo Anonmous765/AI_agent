@@ -12,8 +12,6 @@ to extract relevant information from the HTML content.
 """
 
 import feedparser
-import requests
-import apscheduler
 from normalization.schema import RssNormalizedSignal
 import re
 from datetime import datetime
@@ -95,7 +93,7 @@ DISASTER_KEYWORDS = {
     "emergency": 4,
 }
 
-def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
+def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | None:
     """Return the most recent disaster-related article from a feed.
 
     Args:
@@ -105,8 +103,8 @@ def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
         A normalized signal for the last matching article in the feed,
         or None when no entries contain disaster keywords.
     """
+    signals: list[RssNormalizedSignal] = []
     articles = feed.get("entries") or []
-    disaster_article = None
 
     pattern = re.compile(
         r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
@@ -118,7 +116,6 @@ def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
     source = feed_info.get("title") or feed.get("href") or "News Agency"
 
     for article in articles:
-
         title = article.get("title") or ""
         summary = article.get("summary") or ""
         text = f"{title} {summary}".strip()
@@ -145,8 +142,9 @@ def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
             keywords=keywords,
             raw_text=text,
         )
+        signals.append(disaster_article)
 
-    return disaster_article
+    return signals if signals else None
 
 
 if __name__ == "__main__":

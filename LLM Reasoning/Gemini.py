@@ -111,7 +111,7 @@ for region in RSS_FEEDS.values():
         if not article:
             continue
 
-        useful_articles.append(article)
+        useful_articles.extend(article)
 
 # Seed the chat history with normalized RSS items and NOAA advisories.
 history = []

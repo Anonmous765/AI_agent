@@ -34,5 +34,6 @@ class RssNormalizedSignal:
     title: str
     link: str
     timestamp: datetime
+    confidence: float
     keywords: list[str]
     raw_text: str

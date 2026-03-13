@@ -19,6 +19,8 @@ SOURCE_CONFIDENCE = {
     "Twitter": 0.30,
 }
 
+DEFAULT_NEWS_CONFIDENCE = 0.60
+
 
 def parse_timestamp(ts: str) -> datetime:
     """Parse ISO/RFC timestamps to a datetime.
@@ -96,6 +98,10 @@ def normalize_news_record(record: dict) -> RssNormalizedSignal:
         summary = record.get("summary") or record.get("description") or ""
         raw_text = f"{title} {summary}".strip()
 
+    confidence = record.get("confidence")
+    if confidence is None:
+        confidence = SOURCE_CONFIDENCE.get(source, DEFAULT_NEWS_CONFIDENCE)
+
     keywords = record.get("keywords")
     if isinstance(keywords, str):
         keywords = [item.strip() for item in keywords.split(",") if item.strip()]
@@ -127,6 +133,7 @@ def normalize_news_record(record: dict) -> RssNormalizedSignal:
         title=title,
         link=link,
         timestamp=parsed_timestamp,
+        confidence=confidence,
         keywords=keywords,
         raw_text=raw_text,
     )

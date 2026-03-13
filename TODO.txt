@@ -1,14 +1,71 @@
-import feedparser
-import trafilatura
-import chromadb
-import torch
-from transformers import BertTokenizerFast, BertModel
+
+🔴 Priority 1 — Bug Fixes (Do First)
+
+Wire up DISASTER_KEYWORDS weights — the weighted dict is defined but ignored by the regex; use it to score and rank articles
+
+Fix system prompt delivery in Gemini.py — pass via system_instruction= at client.chats.create(...), not as a regular send_message() call
+
+Add confidence and full_text fields to RssNormalizedSignal in schema.py to match NoaaNormalizedSignal and support trafilatura output
+
+Remove duplicate parse_timestamp — consolidate into normalize.py only; noaa.py should import from there
+
+Remove unused imports — apscheduler, requests in RSS.py; parse_entry_timestamp in Gemini.py
+
+🟠 Priority 2 — Core Pipeline (Your Original TODO)
+Add trafilatura to fetch full article body from each article's link field; store result in full_text on RssNormalizedSignal
+
+Replace regex filter with semantic similarity — use AutoTokenizer + AutoModel from transformers with mean pooling and cosine similarity against an objective sentence
+
+Generate embeddings for full article text using the same transformers encoder; chunk articles > 512 tokens into overlapping segments
+
+Set up ChromaDB — store embeddings + raw_text + metadata (source, timestamp, confidence, county) per article/chunk
+
+Build retrieval function — query ChromaDB with a user query embedding, retrieve top-K chunks, rerank by semantic_score * source_confidence * recency_weight before passing to Gemini
+
+Wire up APScheduler (already imported in RSS.py) — poll all RSS feeds + NOAA every N minutes and ingest new articles automatically
+
+🟡 Priority 3 — Context Quality
+Deduplicate signals — before seeding Gemini context, cluster articles with cosine similarity > 0.92 and keep only the highest-confidence source; prevents same story from LEX18 + WKYT both entering context
+
+Add recency filtering — exclude articles older than a configurable TTL (e.g., 6 hours) from context seeding
+
+Compress context before Gemini — summarize each article to 2–3 sentences (via a Gemini pre-call or lightweight model) to reduce token cost and noise; reference: Context Compression in survey §4.3.3
 
 
-Use these libraries to create a full RAG pipeline
+Add URL-level caching — maintain a persistent seen_urls set (SQLite or flat file) to skip re-fetching and re-embedding already-processed articles
 
-1. Use trafilatura to extract text from HTML
-2. Replace regex filter with more advanced NLP using zero-shot classification
-3. Use transformers and pytorch to generate tokens and embeddings for the text. Store embeddings in chromadb
-4. Create a retrieval function to extract relevant articles from the database
-5. Incorporate a memory system to store recent conversations.
+Concurrency for feed fetching — replace sequential feedparser.parse() calls with concurrent.futures.ThreadPoolExecutor for parallel feed ingestion
+
+🟢 Priority 4 — Memory & Reasoning
+Implement memory hierarchy (three tiers per survey §5.2 ):
+
+Short-term: current session chat history (already exists)
+
+Episodic: past sessions summarized and stored in SQLite with a sessions table
+
+Long-term/Semantic: ChromaDB as persistent vector store across restarts
+
+Add Self-Refinement loop — after each Gemini response, send a follow-up validation prompt asking it to verify every claim against the provided source data; reference: Reflexion / Self-Refine in survey §4.2.2
+
+Structured output from Gemini — use response_schema with a Pydantic model to return JSON (severity, affected_counties, recommended_actions, source_links) instead of free-form Markdown
+
+🔵 Priority 5 — Advanced Enhancements
+Upgrade system prompt using CLEAR framework (survey §4.1.1 ):
+
+
+Add explicit output format instruction
+
+Add Chain-of-Thought trigger ("think step by step about time-sensitivity")
+
+Add self-check instruction ("verify each claim has a source before responding")
+
+Implement Self-RAG pattern (survey §5.1.2 ) — add a pre-retrieval step where Gemini decides whether retrieval is needed before querying ChromaDB, rather than always retrieving
+
+
+Add RAPTOR-style hierarchical summarization (survey §5.1 ) — for long articles, build a summary tree: chunk → chunk summaries → article summary → daily digest; store all levels in ChromaDB
+
+
+Explore GraphRAG / LightRAG (survey §5.1.3 ) — link NOAA alerts ↔ RSS articles by shared county/event type as a knowledge graph for richer relational retrieval
+
+
+Add evaluation scaffolding — expand test_normalization.py into a proper test suite; log retrieval quality metrics (precision@K, source coverage) to measure pipeline improvements over time

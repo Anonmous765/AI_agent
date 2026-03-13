@@ -93,14 +93,16 @@ DISASTER_KEYWORDS = {
     "emergency": 4,
 }
 
+DEFAULT_RSS_CONFIDENCE = 0.60
+
 def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | None:
-    """Return the most recent disaster-related article from a feed.
+    """Return disaster-related articles from a feed.
 
     Args:
         feed: Parsed RSS feed from `feedparser.parse`.
 
     Returns:
-        A normalized signal for the last matching article in the feed,
+        A list of normalized signals for matching articles in the feed,
         or None when no entries contain disaster keywords.
     """
     signals: list[RssNormalizedSignal] = []
@@ -139,6 +141,7 @@ def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | N
             title=title,
             link=link,
             timestamp=timestamp,
+            confidence=DEFAULT_RSS_CONFIDENCE,
             keywords=keywords,
             raw_text=text,
         )
@@ -152,4 +155,3 @@ if __name__ == "__main__":
         for y in x.items():
             print(y[1]['url'])
             print(rss_filter(feedparser.parse(y[1]['url'])))
-

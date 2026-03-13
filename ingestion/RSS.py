@@ -5,6 +5,12 @@ This module maintains a list of local RSS feeds and provides a basic
 keyword-based filter for extracting disaster-relevant articles.
 """
 
+"""
+Expand beyond the basic feedparser to incorporate more advanced parsing and
+filtering logic. Make sure to look into using BeautifulSoup or other libraries
+to extract relevant information from the HTML content.
+"""
+
 import feedparser
 import requests
 import apscheduler
@@ -99,35 +105,42 @@ def rss_filter(feed: feedparser.FeedParserDict) -> RssNormalizedSignal | None:
         A normalized signal for the last matching article in the feed,
         or None when no entries contain disaster keywords.
     """
-    articles = feed["entries"]
+    articles = feed.get("entries") or []
     disaster_article = None
+
     pattern = re.compile(
-        
         r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
         r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency)\b",
         re.IGNORECASE
     )
 
+    feed_info = feed.get("feed") or {}
+    source = feed_info.get("title") or feed.get("href") or "News Agency"
+
     for article in articles:
+
         title = article.get("title") or ""
         summary = article.get("summary") or ""
         text = f"{title} {summary}".strip()
+
         if not re.search(pattern, text):
             continue
 
         matches = [match.group(0).lower() for match in pattern.finditer(text)]
         keywords = list(dict.fromkeys(matches))
+
         published = article.get("published_parsed") or article.get("updated_parsed")
         timestamp = datetime(*published[:6]) if published else datetime.utcnow()
-        author = article.get("author", "None found")
-        source = feed.get("feed", "News Agency").get("title") or feed.get("href", "News Agency")
+
+        author = article.get("author") or "None found"
+        link = article.get("link") or "None found"
 
         disaster_article = RssNormalizedSignal(
             source=source,
             author=author,
             signal_type="News Report",
             title=title,
-            link=article.get("link", "None found"),
+            link=link,
             timestamp=timestamp,
             keywords=keywords,
             raw_text=text,

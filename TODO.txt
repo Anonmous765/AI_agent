@@ -1,0 +1,14 @@
+import feedparser
+import trafilatura
+import chromadb
+import torch
+from transformers import BertTokenizerFast, BertModel
+
+
+Use these libraries to create a full RAG pipeline
+
+1. Use trafilatura to extract text from HTML
+2. Replace regex filter with more advanced NLP using zero-shot classification
+3. Use transformers and pytorch to generate tokens and embeddings for the text. Store embeddings in chromadb
+4. Create a retrieval function to extract relevant articles from the database
+5. Incorporate a memory system to store recent conversations.

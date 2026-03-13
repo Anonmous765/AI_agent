@@ -3,13 +3,9 @@
 
 Wire up DISASTER_KEYWORDS weights — the weighted dict is defined but ignored by the regex; use it to score and rank articles
 
-Fix system prompt delivery in Gemini.py — pass via system_instruction= at client.chats.create(...), not as a regular send_message() call
-
 Add confidence and full_text fields to RssNormalizedSignal in schema.py to match NoaaNormalizedSignal and support trafilatura output
 
 Remove duplicate parse_timestamp — consolidate into normalize.py only; noaa.py should import from there
-
-Remove unused imports — apscheduler, requests in RSS.py; parse_entry_timestamp in Gemini.py
 
 🟠 Priority 2 — Core Pipeline (Your Original TODO)
 Add trafilatura to fetch full article body from each article's link field; store result in full_text on RssNormalizedSignal

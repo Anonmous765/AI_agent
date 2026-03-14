@@ -65,20 +65,6 @@ Your role is to interpret structured data related to weather events, natural dis
 Your output should be concise, factual, and actionable when possible
 """
 
-def parse_entry_timestamp(entry: dict) -> datetime:
-    """Extract the published/updated timestamp from a feedparser entry.
-
-    Args:
-        entry: Feedparser entry mapping with parsed timestamp fields.
-
-    Returns:
-        A UTC datetime from the entry or the current UTC time when missing.
-    """
-    published = entry.get("published_parsed") or entry.get("updated_parsed")
-    if published:
-        return datetime(*published[:6])
-    return datetime.utcnow()
-
 
 def rss_signal_to_json(signal: RssNormalizedSignal) -> str:
     """Serialize a normalized RSS signal to JSON with an ISO 8601 timestamp.

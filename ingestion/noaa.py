@@ -18,7 +18,7 @@ HEADERS = {
 
 NOAA_CONFIDENCE = 0.95
 
-def _parse_timestamp(ts: str) -> datetime:
+def parse_timestamp(ts: str) -> datetime:
     """Parse ISO timestamps from NOAA, defaulting to current UTC on failure."""
     try:
         return datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -49,7 +49,7 @@ def fetch_active_alerts(area="KY"):
             continue
 
         raw_text = f"{props.get('headline', '')} {props.get('description', '')}".strip()
-        timestamp = _parse_timestamp(props.get("sent", ""))
+        timestamp = parse_timestamp(props.get("sent", ""))
 
         for county in counties.split(";"):
             signals.append(

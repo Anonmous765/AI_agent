@@ -62,7 +62,7 @@ Your role is to interpret structured data related to weather events, natural dis
 - If the source is a news agency, include the link to the news article (if available).
 
 **Output Style:**
-Your output should be concise, factual, and actionable when possible, delivered with the poise of a professional broadcaster.
+Your output should be concise, factual, and actionable when possible
 """
 
 def parse_entry_timestamp(entry: dict) -> datetime:

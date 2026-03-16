@@ -1,78 +1,76 @@
 """
-RSS ingestion utilities and feed catalog for Kentucky-area news sources.
+RSS ingestion — extraction layer only.
 
-This module maintains a list of local RSS feeds and provides a basic
-keyword-based filter for extracting disaster-relevant articles.
-"""
+Responsibilities:
+    - Maintain the feed catalog (RSS_FEEDS).
+    - Define disaster keyword weights (DISASTER_KEYWORDS).
+    - Fetch raw feedparser entries from a given feed URL.
 
-"""
-Expand beyond the basic feedparser to incorporate more advanced parsing and
-filtering logic. Make sure to look into using BeautifulSoup or other libraries
-to extract relevant information from the HTML content.
+This module does NOT normalize, filter, or construct dataclass instances.
+All transformation and filtering is handled by normalization/normalize.py.
 """
 
 import feedparser
-from normalization.schema import RssNormalizedSignal
-import re
-from datetime import datetime
 
 RSS_FEEDS = {
     "central_kentucky": {
         "LEX18": {
-            "station":  "LEX 18",
+            "station": "LEX 18",
             "call_sign": "WLEX",
-            "network":  "NBC",
-            "url":      "https://www.lex18.com/news.rss"
+            "network": "NBC",
+            "url": "https://www.lex18.com/news.rss",
         },
         "WKYT": {
-            "station":  "WKYT",
+            "station": "WKYT",
             "call_sign": "WKYT",
-            "network":  "CBS",
-            "url":      "https://www.wkyt.com/rss"
+            "network": "CBS",
+            "url": "https://www.wkyt.com/rss",
         },
         "ABC36": {
-            "station":  "ABC 36",
+            "station": "ABC 36",
             "call_sign": "WTVQ",
-            "network":  "ABC",
-            "url":      "https://wtvq.com/feed"
+            "network": "ABC",
+            "url": "https://wtvq.com/feed",
         },
         "SPECTRUM_KY": {
-            "station":  "Spectrum News 1 KY",
+            "station": "Spectrum News 1 KY",
             "call_sign": "N/A",
-            "network":  "Cable",
-            "url":      "https://spectrumlocalnews.com/services/contentfeed.do?collectionId=9777"
+            "network": "Cable",
+            "url": "https://spectrumlocalnews.com/services/contentfeed.do?collectionId=9777",
         },
     },
     "louisville": {
         "WLKY": {
-            "station":  "WLKY 32",
+            "station": "WLKY 32",
             "call_sign": "WLKY",
-            "network":  "CBS",
-            "url":      "https://www.wlky.com/topstories-rss"
+            "network": "CBS",
+            "url": "https://www.wlky.com/topstories-rss",
         },
         "COURIER_JOURNAL": {
-            "station":  "Courier Journal",
+            "station": "Courier Journal",
             "call_sign": "N/A",
-            "network":  "Print",
-            "url":      "https://www.courier-journal.com/rss/"
+            "network": "Print",
+            "url": "https://www.courier-journal.com/rss/",
         },
         "LOUISVILLE_BUSINESS_FIRST": {
-            "station":  "Louisville Business First",
+            "station": "Louisville Business First",
             "call_sign": "N/A",
-            "network":  "Print",
-            "url":      "https://feeds.bizjournals.com/bizj_louisville"
+            "network": "Print",
+            "url": "https://feeds.bizjournals.com/bizj_louisville",
         },
         "VOICE_TRIBUNE": {
-            "station":  "Voice-Tribune",
+            "station": "Voice-Tribune",
             "call_sign": "N/A",
-            "network":  "Print",
-            "url":      "https://voice-tribune.com/blog-feed.xml"
+            "network": "Print",
+            "url": "https://voice-tribune.com/blog-feed.xml",
         },
-    }
+    },
 }
 
-DISASTER_KEYWORDS = {
-    # keyword -> weight
+# Domain-expert urgency weights.
+# Used in normalization/normalize.py to compute a keyword urgency score
+# that blends with source confidence into the final composite confidence field.
+DISASTER_KEYWORDS: dict[str, int] = {
     "flood": 5,
     "flooding": 5,
     "flash flood": 6,
@@ -93,65 +91,27 @@ DISASTER_KEYWORDS = {
     "emergency": 4,
 }
 
-DEFAULT_RSS_CONFIDENCE = 0.60
 
-def rss_filter(feed: feedparser.FeedParserDict) -> list[RssNormalizedSignal] | None:
-    """Return disaster-related articles from a feed.
+def fetch_raw_articles(url: str) -> tuple[str, list[dict]]:
+    """Fetch raw feedparser entries from an RSS feed URL.
 
     Args:
-        feed: Parsed RSS feed from `feedparser.parse`.
+        url: RSS feed URL to parse.
 
     Returns:
-        A list of normalized signals for matching articles in the feed,
-        or None when no entries contain disaster keywords.
+        A tuple of (source_name, entries) where source_name is the feed's
+        self-reported title (or the URL as fallback) and entries is the raw
+        list of feedparser entry dicts.
     """
-    signals: list[RssNormalizedSignal] = []
-    articles = feed.get("entries") or []
-
-    pattern = re.compile(
-        r"\b(?:flash flood|severe thunderstorm|winter storm|road closed|power outage|boil water|"
-        r"flooding|flood|tornado|storm|ice|snow|evacuation|shelter|river|crest|landslide|emergency)\b",
-        re.IGNORECASE
-    )
-
+    feed = feedparser.parse(url)
     feed_info = feed.get("feed") or {}
     source = feed_info.get("title") or feed.get("href") or "News Agency"
-
-    for article in articles:
-        title = article.get("title") or ""
-        summary = article.get("summary") or ""
-        text = f"{title} {summary}".strip()
-
-        if not re.search(pattern, text):
-            continue
-
-        matches = [match.group(0).lower() for match in pattern.finditer(text)]
-        keywords = list(dict.fromkeys(matches))
-
-        published = article.get("published_parsed") or article.get("updated_parsed")
-        timestamp = datetime(*published[:6]) if published else datetime.utcnow()
-
-        author = article.get("author") or "None found"
-        link = article.get("link") or "None found"
-
-        disaster_article = RssNormalizedSignal(
-            source=source,
-            author=author,
-            signal_type="News Report",
-            title=title,
-            link=link,
-            timestamp=timestamp,
-            confidence=DEFAULT_RSS_CONFIDENCE,
-            keywords=keywords,
-            raw_text=text,
-        )
-        signals.append(disaster_article)
-
-    return signals if signals else None
+    entries = feed.get("entries") or []
+    return source, entries
 
 
 if __name__ == "__main__":
-    for x in RSS_FEEDS.values():
-        for y in x.items():
-            print(y[1]['url'])
-            print(rss_filter(feedparser.parse(y[1]['url'])))
+    for region in RSS_FEEDS.values():
+        for station in region.values():
+            source, entries = fetch_raw_articles(station["url"])
+            print(f"{source}: {len(entries)} entries fetched")

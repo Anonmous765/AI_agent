@@ -1,4 +1,0 @@
-"""Lightweight imports for normalization test scaffolding."""
-
-from ingestion.noaa import fetch_active_alerts
-from normalization.normalize import normalize_noaa_record, normalize_news_record

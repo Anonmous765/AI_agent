@@ -2,8 +2,9 @@
 Interactive Gemini-based situational awareness assistant.
 
 This script:
-- Collects normalized RSS items and NOAA alerts.
-- Seeds them into a Gemini chat session.
+- Fetches raw RSS and NOAA data via the ingestion layer.
+- Normalizes and filters signals via the normalization layer.
+- Seeds a Gemini chat session with the resulting signals.
 - Provides a CLI loop for user queries.
 
 Usage:
@@ -19,27 +20,22 @@ Environment:
 import os
 import json
 from dataclasses import asdict
-from datetime import datetime
 
-import feedparser
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
-from ingestion.noaa import fetch_active_alerts
-from ingestion.RSS import RSS_FEEDS, rss_filter
-from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
-
 from rich.console import Console
 from rich.markdown import Markdown
 
+from ingestion.noaa import fetch_raw_alerts
+from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
+from normalization.Normalize import normalize_noaa_record, normalize_rss_record
+from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
+
 load_dotenv()
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# System instructions for the safety-focused assistant.
 system_prompt = r"""
 You are an AI safety and situational-awareness agent.
 
@@ -62,79 +58,71 @@ Your role is to interpret structured data related to weather events, natural dis
 - If the source is a news agency, include the link to the news article (if available).
 
 **Output Style:**
-Your output should be concise, factual, and actionable when possible
+Your output should be concise, factual, and actionable when possible.
 """
 
 
-def rss_signal_to_json(signal: RssNormalizedSignal) -> str:
-    """Serialize a normalized RSS signal to JSON with an ISO 8601 timestamp.
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
 
-    Args:
-        signal: Normalized RSS signal dataclass instance.
-
-    Returns:
-        JSON-encoded string with an ISO 8601 timestamp.
-    """
-    payload = asdict(signal)
-    payload["timestamp"] = signal.timestamp.isoformat()
-    return json.dumps(payload)
-
-def noaa_signal_to_json(signal: NoaaNormalizedSignal) -> str:
-    """Serialize a normalized NOAA signal to JSON with an ISO 8601 timestamp.
-
-    Args:
-        signal: Normalized NOAA signal dataclass instance.
-
-    Returns:
-        JSON-encoded string with an ISO 8601 timestamp.
-    """
+def _signal_to_json(signal: RssNormalizedSignal | NoaaNormalizedSignal) -> str:
+    """Serialize any normalized signal to a JSON string with ISO 8601 timestamp."""
     payload = asdict(signal)
     payload["timestamp"] = signal.timestamp.isoformat()
     return json.dumps(payload)
 
 
-useful_articles: list[RssNormalizedSignal] = []
+# ---------------------------------------------------------------------------
+# Ingestion + normalization
+# ---------------------------------------------------------------------------
+
+rss_signals: list[RssNormalizedSignal] = []
 
 for region in RSS_FEEDS.values():
     for station in region.values():
-        articles = feedparser.parse(station["url"])
-        article = rss_filter(articles)
-        if not article:
-            continue
+        source, entries = fetch_raw_articles(station["url"])
+        for entry in entries:
+            signal = normalize_rss_record(entry, source)
+            if signal:
+                rss_signals.append(signal)
 
-        useful_articles.extend(article)
+noaa_signals: list[NoaaNormalizedSignal] = []
+for props in fetch_raw_alerts():
+    noaa_signals.extend(normalize_noaa_record(props))
 
-# Seed the chat history with normalized RSS items and NOAA advisories.
+
+# ---------------------------------------------------------------------------
+# Seed Gemini chat history
+# ---------------------------------------------------------------------------
+
 history = []
 history.extend(
-    {"role": "user", "parts": [{"text": rss_signal_to_json(a)}]}
-    for a in useful_articles
+    {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
+    for s in rss_signals
 )
-
 history.extend(
-    {"role": "user", "parts": [{"text": noaa_signal_to_json(alert)}]}
-    for alert in fetch_active_alerts()
+    {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
+    for s in noaa_signals
 )
 
-# Start the chat and prime it with the system prompt.
 chat = client.chats.create(
     model="gemini-3-flash-preview",
-    config=types.GenerateContentConfig(
-        system_instruction=system_prompt,
-    ),
-    history=history
+    config=types.GenerateContentConfig(system_instruction=system_prompt),
+    history=history,
 )
 
 console = Console()
 
+# ---------------------------------------------------------------------------
+# Interactive loop
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
+    print(f"Seeded context: {len(rss_signals)} RSS signal(s), {len(noaa_signals)} NOAA alert(s).")
     while True:
-        # Interactive loop: accept user queries and render Markdown responses.
         message = input("Enter a message: ")
         if message.lower() == "exit":
             break
-
         response = chat.send_message(message)
         console.print(Markdown(response.text))
-
-

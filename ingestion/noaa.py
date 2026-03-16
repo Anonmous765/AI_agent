@@ -1,70 +1,52 @@
 """
-NOAA alert ingestion helpers.
+NOAA alert ingestion — extraction layer only.
 
-Fetches active weather alerts from the National Weather Service API and
-returns normalized signals suitable for downstream reasoning.
+Responsibilities:
+    - Fetch raw alert data from the NWS API.
+    - Return raw property dicts for downstream normalization.
+
+This module does NOT normalize, transform, or construct dataclass instances.
+All transformation is handled by normalization/normalize.py.
 """
 
 import requests
-from datetime import datetime
-
-from normalization.schema import NoaaNormalizedSignal
 
 BASE_URL = "https://api.weather.gov"
 HEADERS = {
     "User-Agent": "KY-Damage-Agent/1.0 (vedansh.kakkar@gmail.com)",
-    "Accept": "application/geo+json"
+    "Accept": "application/geo+json",
 }
 
-NOAA_CONFIDENCE = 0.95
 
-def parse_timestamp(ts: str) -> datetime:
-    """Parse ISO timestamps from NOAA, defaulting to current UTC on failure."""
-    try:
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except Exception:
-        return datetime.utcnow()
-
-def fetch_active_alerts(area="KY"):
-    """Fetch active weather alerts for a given area (e.g., KY).
+def fetch_raw_alerts(area: str = "KY") -> list[dict]:
+    """Fetch raw alert property dicts from the NWS API.
 
     Args:
         area: NWS area code to query (default: "KY").
 
     Returns:
-        A list of normalized NOAA alert signals.
+        A list of raw ``properties`` dicts from each alert feature.
+        Features with no ``areaDesc`` are excluded.
+
+    Raises:
+        requests.HTTPError: If the NWS API returns a non-2xx response.
+        requests.Timeout: If the request exceeds the 10-second timeout.
     """
     url = f"{BASE_URL}/alerts/active/area/{area}"
     response = requests.get(url, headers=HEADERS, timeout=10)
     response.raise_for_status()
 
-    data = response.json()
-    signals = []
+    features = response.json().get("features", [])
 
-    for feature in data.get("features", []):
-        props = feature.get("properties", {})
-        counties = props.get("areaDesc") or ""
+    return [
+        props
+        for feature in features
+        if (props := feature.get("properties", {})) and props.get("areaDesc")
+    ]
 
-        if not counties:
-            continue
-
-        raw_text = f"{props.get('headline', '')} {props.get('description', '')}".strip()
-        timestamp = parse_timestamp(props.get("sent", ""))
-
-        for county in counties.split(";"):
-            signals.append(
-                NoaaNormalizedSignal(
-                    source="NOAA",
-                    county=county.strip(),
-                    signal_type=props.get("event", "Weather Alert"),
-                    severity=props.get("severity"),
-                    timestamp=timestamp,
-                    confidence=NOAA_CONFIDENCE,
-                    raw_text=raw_text,
-                )
-            )
-
-    return signals
 
 if __name__ == "__main__":
-    print(fetch_active_alerts())
+    alerts = fetch_raw_alerts()
+    print(f"Fetched {len(alerts)} raw alert(s).")
+    for a in alerts[:2]:
+        print(a.get("headline", "No headline"))

@@ -80,11 +80,11 @@ def parse_timestamp(ts: str) -> datetime:
 def _extract_keywords_and_urgency(text: str) -> tuple[list[str], float]:
     """Match disaster keywords and return a normalized urgency score.
 
-    This wires up the DISASTER_KEYWORDS weights that were previously ignored
+    This wires up the DISASTER_KEYWORDS weights previously ignored
     by the regex filter.
 
     Args:
-        text: Combined title + summary text to scan.
+        text: Combined title and summary text to scan.
 
     Returns:
         A tuple of (matched_keywords, urgency_score) where urgency_score
@@ -148,7 +148,7 @@ def normalize_rss_record(
     Filtering:  Returns None if the entry contains no disaster keywords.
     Scoring:    Composite confidence = (source_reliability * 0.7)
                                      + (keyword_urgency   * 0.3)
-    full_text:  Defaults to raw_text (title + summary). Trafilatura will
+    full_text:  Defaults to raw_text (title and summary). Trafilatura will
                 overwrite this field in a later enrichment step.
 
     Args:

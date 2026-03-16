@@ -31,6 +31,7 @@ class RssNormalizedSignal:
     source: str
     author: str
     signal_type: str
+    severity: Optional[str]
     title: str
     link: str
     timestamp: datetime

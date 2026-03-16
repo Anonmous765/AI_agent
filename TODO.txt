@@ -3,7 +3,7 @@
 
 Wire up DISASTER_KEYWORDS weights — the weighted dict is defined but ignored by the regex; use it to score and rank articles
 
-Add confidence and full_text fields to RssNormalizedSignal in schema.py to match NoaaNormalizedSignal and support trafilatura output
+Add confidence and full_text fields to RssNormalizedSignal in schema.py to match NoaaNormalizedSignal and **support trafilatura output** <-- This still needs to be done
 
 Remove duplicate parse_timestamp — consolidate into normalize.py only; noaa.py should import from there
 

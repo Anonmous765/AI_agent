@@ -62,9 +62,7 @@ Your output should be concise, factual, and actionable when possible.
 """
 
 
-# ---------------------------------------------------------------------------
 # Serialization helpers
-# ---------------------------------------------------------------------------
 
 def _signal_to_json(signal: RssNormalizedSignal | NoaaNormalizedSignal) -> str:
     """Serialize any normalized signal to a JSON string with ISO 8601 timestamp."""
@@ -73,9 +71,7 @@ def _signal_to_json(signal: RssNormalizedSignal | NoaaNormalizedSignal) -> str:
     return json.dumps(payload)
 
 
-# ---------------------------------------------------------------------------
 # Ingestion + normalization
-# ---------------------------------------------------------------------------
 
 rss_signals: list[RssNormalizedSignal] = []
 
@@ -92,9 +88,7 @@ for props in fetch_raw_alerts():
     noaa_signals.extend(normalize_noaa_record(props))
 
 
-# ---------------------------------------------------------------------------
 # Seed Gemini chat history
-# ---------------------------------------------------------------------------
 
 history = []
 history.extend(
@@ -114,9 +108,7 @@ chat = client.chats.create(
 
 console = Console()
 
-# ---------------------------------------------------------------------------
 # Interactive loop
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     print(f"Seeded context: {len(rss_signals)} RSS signal(s), {len(noaa_signals)} NOAA alert(s).")

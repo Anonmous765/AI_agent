@@ -1,14 +1,6 @@
 
-🔴 Priority 1 — Bug Fixes (Do First)
-
-Wire up DISASTER_KEYWORDS weights — the weighted dict is defined but ignored by the regex; use it to score and rank articles
-
-Add confidence and full_text fields to RssNormalizedSignal in schema.py to match NoaaNormalizedSignal and **support trafilatura output** <-- This still needs to be done
-
-Remove duplicate parse_timestamp — consolidate into normalize.py only; noaa.py should import from there
 
 🟠 Priority 2 — Core Pipeline (Your Original TODO)
-Add trafilatura to fetch full article body from each article's link field; store result in full_text on RssNormalizedSignal
 
 Replace regex filter with semantic similarity — use AutoTokenizer + AutoModel from transformers with mean pooling and cosine similarity against an objective sentence
 
@@ -29,8 +21,6 @@ Compress context before Gemini — summarize each article to 2–3 sentences (vi
 
 
 Add URL-level caching — maintain a persistent seen_urls set (SQLite or flat file) to skip re-fetching and re-embedding already-processed articles
-
-Concurrency for feed fetching — replace sequential feedparser.parse() calls with concurrent.futures.ThreadPoolExecutor for parallel feed ingestion
 
 🟢 Priority 4 — Memory & Reasoning
 Implement memory hierarchy (three tiers per survey §5.2 ):

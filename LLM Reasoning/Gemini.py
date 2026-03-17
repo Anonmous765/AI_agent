@@ -31,6 +31,7 @@ from ingestion.noaa import fetch_raw_alerts
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from normalization.Normalize import normalize_noaa_record, normalize_rss_record
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
+from normalization.enrich import enrich_rss_signals
 
 load_dotenv()
 
@@ -82,6 +83,8 @@ for region in RSS_FEEDS.values():
             signal = normalize_rss_record(entry, source)
             if signal:
                 rss_signals.append(signal)
+# Add full text to each signal
+rss_signals = enrich_rss_signals(rss_signals)
 
 noaa_signals: list[NoaaNormalizedSignal] = []
 for props in fetch_raw_alerts():

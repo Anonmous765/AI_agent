@@ -20,7 +20,7 @@ prompt_embs = model.encode(
     normalize_embeddings=True
 )
 
-def _classify_article(title: str, summary: str, threshold: float=0.40) -> dict:
+def classify_article(title: str, summary: str, threshold: float=0.40) -> dict:
     """
     Classify an article based on its title and summary.
     :param title:

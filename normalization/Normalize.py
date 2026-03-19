@@ -19,7 +19,7 @@ from typing import Optional
 
 from ingestion.RSS import DISASTER_KEYWORDS
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
-from normalization.semantic_filter import _classify_article
+from normalization.semantic_filter import classify_article
 
 # Source reliability weights
 
@@ -159,7 +159,7 @@ def normalize_rss_record(
 
     keywords, urgency_score = _extract_keywords_and_urgency(raw_text)
 
-    article_info = _classify_article(title, summary, threshold=0.40)
+    article_info = classify_article(title, summary, threshold=0.40)
 
     if not article_info["relevant"]:
         return None
@@ -195,5 +195,5 @@ if __name__ == "__main__":
 
     source, entries = fetch_raw_articles("https://www.lex18.com/news.rss")
 
-    testArticle = _classify_article(entries[0].get("title") or "", entries[0].get("summary") or "")
+    testArticle = classify_article(entries[0].get("title") or "", entries[0].get("summary") or "")
     print(".")

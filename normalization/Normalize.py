@@ -16,13 +16,62 @@ RssNormalizedSignal instances. Ingestion modules return raw dicts/entries.
 import re
 from datetime import datetime
 from typing import Optional
+from sentence_transformers import SentenceTransformer, util
+import torch
 
 from ingestion.RSS import DISASTER_KEYWORDS
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
 
-# ---------------------------------------------------------------------------
+# Models used for embeddings
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+PROMPTS = {
+    "flood": "flooding flash flood rising river water rescue flood warning",
+    "tornado": "tornado severe thunderstorm wind damage funnel cloud storm emergency",
+    "outage": "power outage utility disruption downed lines transformer failure",
+    "water": "boil water advisory water contamination water main break",
+    "evacuation": "evacuation shelter emergency response road closure public safety"
+}
+
+labels = list(PROMPTS.keys())
+prompt_texts = list(PROMPTS.values())
+
+prompt_embs = model.encode(
+    prompt_texts,
+    convert_to_tensor=True,
+    normalize_embeddings=True
+)
+
+def _classify_article(title: str, summary: str, threshold: float=0.40) -> dict:
+    """
+    Classify an article based on its title and summary.
+    :param title:
+    :param summary:
+    :param threshold:
+    :return:
+    """
+
+    text = f"{title}. {summary}"
+    article_emb = model.encode(
+        text,
+        convert_to_tensor=True,
+        normalize_embeddings=True
+    )
+
+    scores = util.cos_sim(article_emb, prompt_embs)[0]
+    best_idx = torch.argmax(scores).item()
+    best_label = labels[best_idx]
+    best_score = scores[best_idx].item()
+
+    return {
+        "relevant": best_score >= threshold,
+        "label": best_label,
+        "score": best_score,
+        "scores": {labels[i]: scores[i].item() for i in range(len(labels))}
+    }
+
 # Source reliability weights
-# ---------------------------------------------------------------------------
 
 SOURCE_CONFIDENCE: dict[str, float] = {
     "NOAA": 0.95,
@@ -56,9 +105,7 @@ _KEYWORD_PATTERN = re.compile(
 _MAX_KEYWORD_SCORE: int = sum(DISASTER_KEYWORDS.values())
 
 
-# ---------------------------------------------------------------------------
 # Shared utilities
-# ---------------------------------------------------------------------------
 
 def parse_timestamp(ts: str) -> datetime:
     """Parse ISO 8601 / RFC timestamps to a datetime.
@@ -97,9 +144,7 @@ def _extract_keywords_and_urgency(text: str) -> tuple[list[str], float]:
     return keywords, urgency_score
 
 
-# ---------------------------------------------------------------------------
 # NOAA normalization
-# ---------------------------------------------------------------------------
 
 def normalize_noaa_record(props: dict) -> list[NoaaNormalizedSignal]:
     """Convert a raw NWS alert properties dict into normalized signals.
@@ -164,8 +209,12 @@ def normalize_rss_record(
 
     keywords, urgency_score = _extract_keywords_and_urgency(raw_text)
 
-    if not keywords:
-        return None  # not disaster-relevant; discard
+    article_info = _classify_article(title, summary, threshold=0.40)
+
+    if not article_info["relevant"]:
+        return None
+
+
 
     published = entry.get("published_parsed") or entry.get("updated_parsed")
     timestamp = datetime(*published[:6]) if published else datetime.utcnow()
@@ -189,3 +238,12 @@ def normalize_rss_record(
         raw_text=raw_text,
         full_text=raw_text,  # trafilatura overwrites this in enrichment step
     )
+
+
+if __name__ == "__main__":
+    from ingestion.RSS import fetch_raw_articles
+
+    source, entries = fetch_raw_articles("https://www.lex18.com/news.rss")
+
+    testArticle = _classify_article(entries[0].get("title") or "", entries[0].get("summary") or "")
+    print(".")

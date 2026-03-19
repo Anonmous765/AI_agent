@@ -16,8 +16,6 @@ RssNormalizedSignal instances. Ingestion modules return raw dicts/entries.
 import re
 from datetime import datetime
 from typing import Optional
-from sentence_transformers import SentenceTransformer, util
-import torch
 
 from ingestion.RSS import DISASTER_KEYWORDS
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal

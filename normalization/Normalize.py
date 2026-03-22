@@ -187,7 +187,7 @@ def normalize_rss_record(
         keywords=keywords,
         raw_text=raw_text,
         full_text=raw_text,  # trafilatura overwrites this in enrichment step
-        embeddings=article_info["embeddings"],
+        embeddings=article_info["article_emb"],
     )
 
 

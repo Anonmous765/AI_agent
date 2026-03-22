@@ -14,3 +14,6 @@ testing.ipynb
 
 # Git
 .git/
+
+# Database
+.chroma_db

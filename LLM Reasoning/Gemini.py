@@ -32,7 +32,8 @@ from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from normalization.Normalize import normalize_noaa_record, normalize_rss_record
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
 from normalization.enrich import enrich_rss_signals
-from normalization.
+from memory.database import rss_signal_storage
+
 load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -91,8 +92,9 @@ for region in RSS_FEEDS.values():
             signal = normalize_rss_record(entry, source)
             if signal:
                 rss_signals.append(signal)
-# Add full text to each signal
+# Add full text to each signal and store in database
 rss_signals = enrich_rss_signals(rss_signals)
+rss_signal_storage(rss_signals)
 
 noaa_signals: list[NoaaNormalizedSignal] = []
 for props in fetch_raw_alerts():

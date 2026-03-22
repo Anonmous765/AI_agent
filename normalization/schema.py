@@ -48,3 +48,4 @@ class RssNormalizedSignal:
     keywords: list[str]
     raw_text: str
     full_text: str = field(default="")
+    embeddings: list[float] = None

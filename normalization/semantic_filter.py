@@ -45,5 +45,6 @@ def classify_article(title: str, summary: str, threshold: float=0.40) -> dict:
         "relevant": best_score >= threshold,
         "label": best_label,
         "score": best_score,
-        "scores": {labels[i]: scores[i].item() for i in range(len(labels))}
+        "scores": {labels[i]: scores[i].item() for i in range(len(labels))},
+        "article_emb": article_emb.tolist()
     }

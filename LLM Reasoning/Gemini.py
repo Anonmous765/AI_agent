@@ -32,7 +32,7 @@ from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from normalization.Normalize import normalize_noaa_record, normalize_rss_record
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
 from normalization.enrich import enrich_rss_signals
-from memory.database import rss_signal_storage
+from memory.database import rss_signal_storage, query_db
 
 load_dotenv()
 
@@ -115,7 +115,8 @@ history.extend(
 
 chat = client.chats.create(
     model="gemini-3-flash-preview",
-    config=types.GenerateContentConfig(system_instruction=system_prompt),
+    config=types.GenerateContentConfig(system_instruction=system_prompt,
+                                       tools=[query_db]),
     history=history,
 )
 

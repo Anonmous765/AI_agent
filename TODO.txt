@@ -2,10 +2,6 @@
 
 🟠 Priority 2 — Core Pipeline (Your Original TODO)
 
-Set up ChromaDB — store embeddings + raw_text + metadata (source, timestamp, confidence, county) per article/chunk
-
-Build retrieval function — query ChromaDB with a user query embedding, retrieve top-K chunks, rerank by semantic_score * source_confidence * recency_weight before passing to Gemini
-
 Wire up APScheduler (already imported in RSS.py) — poll all RSS feeds + NOAA every N minutes and ingest new articles automatically
 
 🟡 Priority 3 — Context Quality

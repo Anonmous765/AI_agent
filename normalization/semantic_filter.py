@@ -61,7 +61,7 @@ def classify_article(title: str, summary: str, threshold: float=0.40) -> dict:
     location_score = torch.max(location_scores).item()
 
     return {
-        "relevant": (best_score >= threshold) and (location_score >= threshold),
+        "relevant": (best_score >= threshold),
         "label": best_label,
         "score": best_score,
         "location_score": location_score,

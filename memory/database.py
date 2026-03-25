@@ -88,9 +88,9 @@ def query_db(query: str, limit: int = 10):
 
     query_embedding = model.encode(
         query,
-        convert_to_tensor=True,
+        convert_to_numpy=True,
         normalize_embeddings=True
-    )
+    ).tolist()
 
     result = collection.query(
         query_embeddings=[query_embedding],

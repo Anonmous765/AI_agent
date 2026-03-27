@@ -1,5 +1,7 @@
 from sentence_transformers import SentenceTransformer, util
 import torch
+import spacy
+import geopy
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -8,7 +10,11 @@ PROMPTS = {
     "tornado": "tornado severe thunderstorm wind damage funnel cloud storm emergency",
     "outage": "power outage utility disruption downed lines transformer failure",
     "water": "boil water advisory water contamination water main break",
-    "evacuation": "evacuation shelter emergency response road closure public safety"
+    "evacuation": "evacuation shelter emergency response road closure public safety",
+    "traffic": "vehicle fire road closure lane blocked accident crash highway interstate emergency detour",
+    "fire": "structure fire building fire wildfire brush fire firefighters blaze smoke",
+    "hazmat": "hazardous materials chemical spill gas leak explosion industrial accident",
+    "infrastructure": "bridge collapse dam failure sinkhole landslide road damage highway closed",
 }
 
 KY_LOCATIONS = [

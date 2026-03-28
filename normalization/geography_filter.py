@@ -9,4 +9,3 @@ ruler.add_patterns([
     {"label": "KY_ROAD", "pattern": [{"TEXT": {"REGEX": r"^KY-\d+$"}}]},
     {"label": "KY_ROAD", "pattern": [{"TEXT": {"REGEX": r"^US-\d+$"}}]},
 ])
-

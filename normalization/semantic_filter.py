@@ -1,7 +1,7 @@
 from sentence_transformers import SentenceTransformer, util
 import torch
-import spacy
-import geopy
+
+from normalization.schema import RssNormalizedSignal
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -39,16 +39,16 @@ location_embs = model.encode(
     normalize_embeddings=True
 )
 
-def classify_article(title: str, summary: str, threshold: float=0.40) -> dict:
+
+def classify_article(signal: RssNormalizedSignal, threshold: float = 0.40) -> dict:
     """
-    Classify an article based on its title and summary.
-    :param title:
-    :param summary:
+    Classify an article based on its normalized RSS signal.
+    :param signal:
     :param threshold:
     :return:
     """
 
-    text = f"{title}. {summary}"
+    text = signal.raw_text
     article_emb = model.encode(
         text,
         convert_to_tensor=True,

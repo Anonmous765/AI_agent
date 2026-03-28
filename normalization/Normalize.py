@@ -130,41 +130,32 @@ def normalize_noaa_record(props: dict) -> list[NoaaNormalizedSignal]:
     ]
 
 
-# ---------------------------------------------------------------------------
 # RSS normalization
-# ---------------------------------------------------------------------------
 
 def normalize_rss_record(
         entry: dict,
         source: str,
 ) -> Optional[RssNormalizedSignal]:
-    """Filter and normalize a raw feedparser entry into an RSS signal.
+    """
+    Normalizes an RSS feed entry into the RssNormalizedSignal format. This function processes
+    the input RSS feed entry, extracts relevant information, evaluates its importance using
+    keywords and urgency, and returns a normalized signal if the article is classified as
+    relevant.
 
-    Filtering:  Returns None if the entry contains no disaster keywords.
-    Scoring:    Composite confidence = (source_reliability * 0.7)
-                                     + (keyword_urgency   * 0.3)
-    full_text:  Defaults to raw_text (title and summary). Trafilatura will
-                overwrite this field in a later enrichment step.
-
-    Args:
-        entry:  Raw feedparser entry dict.
-        source: Feed source name returned by fetch_raw_articles().
-
-    Returns:
-        A normalized RSS signal, or None if not disaster-relevant.
+    :param entry: The RSS feed entry represented as a dictionary containing fields such as
+                  "title", "summary", "published_parsed", and "author".
+    :type entry: dict
+    :param source: The source of the RSS feed represented as a string.
+    :type source: str
+    :return: A normalized RssNormalizedSignal object if the article is deemed relevant,
+             otherwise None.
+    :rtype: Optional[RssNormalizedSignal]
     """
     title = entry.get("title") or ""
     summary = entry.get("summary") or ""
     raw_text = f"{title} {summary}".strip()
 
     keywords, urgency_score = _extract_keywords_and_urgency(raw_text)
-
-    article_info = classify_article(title, summary, threshold=0.40)
-
-    if not article_info["relevant"]:
-        return None
-
-
 
     published = entry.get("published_parsed") or entry.get("updated_parsed")
     timestamp = datetime(*published[:6]) if published else datetime.utcnow()
@@ -187,7 +178,6 @@ def normalize_rss_record(
         keywords=keywords,
         raw_text=raw_text,
         full_text=raw_text,  # trafilatura overwrites this in enrichment step
-        embeddings=article_info["article_emb"],
     )
 
 
@@ -196,5 +186,7 @@ if __name__ == "__main__":
 
     source, entries = fetch_raw_articles("https://www.lex18.com/news.rss")
 
-    testArticle = classify_article(entries[0].get("title") or "", entries[0].get("summary") or "")
-    print(".")
+    test_signal = normalize_rss_record(entries[0], source)
+    if test_signal:
+        testArticle = classify_article(test_signal)
+        print(".")

@@ -15,6 +15,11 @@ PROMPTS = {
     "fire": "structure fire building fire wildfire brush fire firefighters blaze smoke",
     "hazmat": "hazardous materials chemical spill gas leak explosion industrial accident",
     "infrastructure": "bridge collapse dam failure sinkhole landslide road damage highway closed",
+    "shooting": "shooting gunshot gunfire shot fired victim wounded killed gun violence armed suspect",
+    "crime": "arrest warrant fugitive armed dangerous suspect wanted manhunt law enforcement police",
+    "violence": "homicide murder stabbing assault robbery attack violent crime victim",
+    "active_threat": "active shooter lockdown shelter in place threat armed standoff hostage barricade",
+    "missing_person": "missing person amber alert endangered missing child abduction search rescue",
 }
 
 KY_LOCATIONS = [

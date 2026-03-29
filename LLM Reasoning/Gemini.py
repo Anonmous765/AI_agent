@@ -29,11 +29,12 @@ from rich.markdown import Markdown
 
 from ingestion.noaa import fetch_raw_alerts
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
-from normalization.Normalize import normalize_noaa_record, normalize_rss_record
-from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
-from normalization.enrich import enrich_rss_signals
+from processing.normalize_noaa import normalize_noaa_record
+from processing.normalize_rss import normalize_rss_record
+from models.schema import NoaaNormalizedSignal, RssNormalizedSignal
+from processing.enrich import enrich_rss_signals
 from memory.database import rss_signal_storage, query_db
-from normalization.semantic_filter import classify_article
+from processing.semantic_filter import classify_article
 
 load_dotenv()
 

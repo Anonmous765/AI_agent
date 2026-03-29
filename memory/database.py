@@ -10,8 +10,8 @@ import chromadb
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-from normalization.schema import RssNormalizedSignal
-from normalization.semantic_filter import classify_article
+from models.schema import RssNormalizedSignal
+from processing.semantic_filter import classify_article
 
 load_dotenv()
 

@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from trafilatura import fetch_url, extract
-from normalization.schema import RssNormalizedSignal
+from models.schema import RssNormalizedSignal
 
 
 def _enrich_rss_signal(signal: RssNormalizedSignal) -> RssNormalizedSignal:

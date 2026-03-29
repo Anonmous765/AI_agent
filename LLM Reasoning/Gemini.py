@@ -33,6 +33,7 @@ from normalization.Normalize import normalize_noaa_record, normalize_rss_record
 from normalization.schema import NoaaNormalizedSignal, RssNormalizedSignal
 from normalization.enrich import enrich_rss_signals
 from memory.database import rss_signal_storage, query_db
+from normalization.semantic_filter import classify_article
 
 load_dotenv()
 
@@ -91,7 +92,9 @@ for region in RSS_FEEDS.values():
         for entry in entries:
             signal = normalize_rss_record(entry, source)
             if signal:
-                rss_signals.append(signal)
+                relevance = classify_article(signal)["relevant"]
+                if relevance:
+                    rss_signals.append(signal)
 # Add full text to each signal and store in database
 rss_signals = enrich_rss_signals(rss_signals)
 rss_signal_storage(rss_signals)

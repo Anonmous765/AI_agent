@@ -186,7 +186,10 @@ if __name__ == "__main__":
 
     source, entries = fetch_raw_articles("https://www.lex18.com/news.rss")
 
-    test_signal = normalize_rss_record(entries[0], source)
-    if test_signal:
-        testArticle = classify_article(test_signal)
-        print(".")
+    i = 0
+    for entry in entries:
+        test_signal = normalize_rss_record(entry, source)
+        i += 1
+        if test_signal:
+            testArticle = classify_article(test_signal)
+            print(f"Article {i} is {test_signal.title}")

@@ -1,11 +1,12 @@
 import spacy
 from spacy.pipeline import EntityRuler
 
-nlp = spacy.load("en_core_web_sm")
+nlp = spacy.load("en_core_web_trf")
 
 ruler = nlp.add_pipe("entity_ruler", before="ner")
-ruler.add_patterns([
-    {"label": "KY_ROAD", "pattern": [{"TEXT": {"REGEX": r"^I-\d+$"}}]},
-    {"label": "KY_ROAD", "pattern": [{"TEXT": {"REGEX": r"^KY-\d+$"}}]},
-    {"label": "KY_ROAD", "pattern": [{"TEXT": {"REGEX": r"^US-\d+$"}}]},
-])
+
+
+
+if __name__ == "__main__":
+    doc = nlp("Major flooding in Louisville, KY.")
+    print("\n".join(f"{ent.text:<20} {ent.label_:<12} " for ent in doc.ents))

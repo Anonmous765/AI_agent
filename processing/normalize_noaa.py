@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from models.schema import NoaaNormalizedSignal
+from schemas.schema import NoaaNormalizedSignal
 from processing.scoring import NOAA_CONFIDENCE
 
 

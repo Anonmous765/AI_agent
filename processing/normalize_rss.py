@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from models.schema import RssNormalizedSignal
+from schemas.schema import RssNormalizedSignal
 from processing.scoring import (
     DEFAULT_RSS_CONFIDENCE,
     SOURCE_BLEND,
@@ -34,7 +34,7 @@ def normalize_rss_record(
     """
     title = entry.get("title") or ""
     summary = entry.get("summary") or ""
-    raw_text = f"{title} {summary}".strip()
+    raw_text = f"{title}. {summary}".strip()
 
     keywords, urgency_score = _extract_keywords_and_urgency(raw_text)
 

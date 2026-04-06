@@ -31,7 +31,7 @@ from ingestion.noaa import fetch_raw_alerts
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from processing.normalize_noaa import normalize_noaa_record
 from processing.normalize_rss import normalize_rss_record
-from models.schema import NoaaNormalizedSignal, RssNormalizedSignal
+from schemas.schema import NoaaNormalizedSignal, RssNormalizedSignal
 from processing.enrich import enrich_rss_signals
 from memory.database import rss_signal_storage, query_db
 from processing.semantic_filter import classify_article

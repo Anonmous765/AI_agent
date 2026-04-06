@@ -17,3 +17,7 @@ testing.ipynb
 
 # Database
 .chroma_db
+
+# Local data
+gazetteer/
+kentucky-260404.osm.pbf

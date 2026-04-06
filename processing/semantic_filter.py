@@ -47,7 +47,7 @@ location_embs = model.encode(
 
 def classify_article(signal: RssNormalizedSignal, threshold: float = 0.40) -> dict:
     """
-    Classify an article based on its normalized RSS signal.
+    Classify an article based on its normalized RSS rss_signal.
     :param signal:
     :param threshold:
     :return:

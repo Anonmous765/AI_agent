@@ -77,7 +77,7 @@ Your output should be concise, factual, and actionable when possible.
 # Serialization helpers
 
 def _signal_to_json(signal: RssNormalizedSignal | NoaaNormalizedSignal) -> str:
-    """Serialize any normalized signal to a JSON string with ISO 8601 timestamp."""
+    """Serialize any normalized rss_signal to a JSON string with ISO 8601 timestamp."""
     payload = asdict(signal)
     payload["timestamp"] = signal.timestamp.isoformat()
     return json.dumps(payload)
@@ -96,7 +96,7 @@ for region in RSS_FEEDS.values():
                 relevance = classify_article(signal)["relevant"]
                 if relevance:
                     rss_signals.append(signal)
-# Add full text to each signal and store in database
+# Add full text to each rss_signal and store in database
 rss_signals = enrich_rss_signals(rss_signals)
 rss_signal_storage(rss_signals)
 
@@ -129,7 +129,7 @@ console = Console()
 # Interactive loop
 
 if __name__ == "__main__":
-    print(f"Seeded context: {len(rss_signals)} RSS signal(s), {len(noaa_signals)} NOAA alert(s).")
+    print(f"Seeded context: {len(rss_signals)} RSS rss_signal(s), {len(noaa_signals)} NOAA alert(s).")
     while True:
         message = input("Enter a message: ")
         if message.lower() == "exit":

@@ -26,7 +26,7 @@ def parse_timestamp(ts: str) -> datetime:
 def normalize_noaa_record(props: dict) -> list[NoaaNormalizedSignal]:
     """Convert a raw NWS alert properties dict into normalized signals.
 
-    One signal is emitted per county listed in ``areaDesc``.
+    One rss_signal is emitted per county listed in ``areaDesc``.
 
     Args:
         props: Raw ``properties`` dict from a NWS GeoJSON alert feature.

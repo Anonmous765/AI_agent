@@ -20,7 +20,7 @@ def normalize_rss_record(
     """
     Normalizes an RSS feed entry into the RssNormalizedSignal format. This function processes
     the input RSS feed entry, extracts relevant information, evaluates its importance using
-    keywords and urgency, and returns a normalized signal if the article is classified as
+    keywords and urgency, and returns a normalized rss_signal if the article is classified as
     relevant.
 
     :param entry: The RSS feed entry represented as a dictionary containing fields such as

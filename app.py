@@ -41,7 +41,7 @@ chat = gemini_module.chat
 chat_lock = threading.Lock()
 
 
-# Print the same seeded signal counts that Gemini.py prints in its CLI entry point.
+# Print the same seeded rss_signal counts that Gemini.py prints in its CLI entry point.
 print(
     f"Seeded context: {len(gemini_module.rss_signals)} RSS signal(s), "
     f"{len(gemini_module.noaa_signals)} NOAA alert(s)."

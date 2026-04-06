@@ -1,4 +1,6 @@
 import spacy
+import pandas as pd
+from pathlib import Path
 from spacy.pipeline import EntityRuler
 import feedparser
 
@@ -6,13 +8,20 @@ from schemas.schema import EntityInfo, RssNormalizedSignal
 from processing.normalize_rss import normalize_rss_record
 from processing.enrich import enrich_rss_signals
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+GAZETTEER_CSV = PROJECT_ROOT / "gazetteer" / "Text" / "DomesticNames_KY.csv"
+
 nlp = spacy.load("en_core_web_trf")
 
 ruler = nlp.add_pipe("entity_ruler", before="ner")
 
+if not GAZETTEER_CSV.exists():
+    raise FileNotFoundError(f"Gazetteer CSV not found at {GAZETTEER_CSV}")
 
-def geo_info(signal: RssNormalizedSignal) -> list[EntityInfo]:
-    text = signal.raw_text
+gazetteer = pd.read_csv(GAZETTEER_CSV)
+
+def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
+    text = rss_signal.raw_text
     doc = nlp(text)
 
     entities = []
@@ -25,6 +34,9 @@ def geo_info(signal: RssNormalizedSignal) -> list[EntityInfo]:
             )
         )
     return entities
+
+def geo_relevance(list_of_entities: list[EntityInfo]) -> float:
+    pass
 
 
 if __name__ == "__main__":
@@ -41,15 +53,15 @@ if __name__ == "__main__":
         # Use the first entry from the feed
         entry = feed.entries[0]
 
-        # Normalize the entry to create a signal
+        # Normalize the entry to create a rss_signal
         signal = normalize_rss_record(entry, source=source_name)
 
         if signal:
-            # Enrich the signal with full article text
+            # Enrich the rss_signal with full article text
             enriched_signals = enrich_rss_signals([signal])
             signal = enriched_signals[0] if enriched_signals else signal
 
-            print(f"Testing geo_info with signal from: {signal.source}")
+            print(f"Testing geo_info with rss_signal from: {signal.source}")
             print(f"Title: {signal.title}")
             print(f"Raw text: {signal.raw_text}\n")
             print("Extracted entities:")
@@ -59,4 +71,4 @@ if __name__ == "__main__":
             print(f"\nResult: {result}")
             print("\n")
         else:
-            print("Failed to create signal from RSS entry")
+            print("Failed to create rss_signal from RSS entry")

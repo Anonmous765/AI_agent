@@ -29,7 +29,7 @@ class NoaaNormalizedSignal:
 
 @dataclass
 class RssNormalizedSignal:
-    """Normalized representation of a news-based signal."""
+    """Normalized representation of a news-based rss_signal."""
 
     source: str
     author: str

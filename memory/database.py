@@ -4,7 +4,7 @@ Database operations for storing and querying signals using ChromaDB.
 
 import hashlib
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 import chromadb
 from dotenv import load_dotenv
@@ -27,6 +27,11 @@ collection = chroma_client.get_or_create_collection(
     name="signals",
     metadata={"hnsw:space": "cosine"},
 )
+
+
+def _ranking_score(signal: RssNormalizedSignal, classified_article: dict[str, Any]) -> float:
+    """Blend source/keyword confidence with semantic relevance for stable ranking."""
+    return round((signal.confidence * 0.7) + (classified_article["score"] * 0.3), 4)
 
 
 def rss_signal_storage(signals: List[RssNormalizedSignal]) -> None:
@@ -57,7 +62,11 @@ def rss_signal_storage(signals: List[RssNormalizedSignal]) -> None:
             "source": signal.source,
             "label": classified_article["label"],
             "score": round(classified_article["score"], 4),
+            "confidence": round(signal.confidence, 4),
+            "rank_score": _ranking_score(signal, classified_article),
             "timestamp": signal.timestamp.isoformat(),
+            "title": signal.title,
+            "keywords": ", ".join(signal.keywords),
             "link": signal.link or ""  # guard against None
         })
 
@@ -78,9 +87,21 @@ def query_db(query: str, limit: int = 10):
     in the database to provide historical context, find similar past events, or
     retrieve specific information related to a user's inquiry.
 
+    Important:
+        The returned matches are already ordered by priority, with the highest-
+        confidence signals first. Preserve this ordering when summarizing results
+        or citing them. Earlier items should be treated as more reliable and more
+        important than later items unless the user explicitly asks for a different
+        ordering.
+
     Args:
         query: The search term or natural language text to embed and find matches for.
         limit: The maximum number of relevant database results to return.
+
+    Returns:
+        A dictionary containing the original query and a `matches` list. The
+        `matches` list is sorted in descending priority using confidence first,
+        then rank_score, semantic score, and timestamp.
     """
 
     print(f"[TOOL CALLED] query_signals(topic='{query}', n_results={limit})")
@@ -97,4 +118,27 @@ def query_db(query: str, limit: int = 10):
         include=["documents", "metadatas"]
     )
 
-    return result
+    documents = result.get("documents", [[]])[0]
+    metadatas = result.get("metadatas", [[]])[0]
+
+    ranked_matches = sorted(
+        (
+            {
+                "document": document,
+                **metadata,
+            }
+            for document, metadata in zip(documents, metadatas)
+        ),
+        key=lambda item: (
+            item.get("confidence", 0.0),
+            item.get("rank_score", 0.0),
+            item.get("score", 0.0),
+            item.get("timestamp", ""),
+        ),
+        reverse=True,
+    )
+
+    return {
+        "query": query,
+        "matches": ranked_matches[:limit],
+    }

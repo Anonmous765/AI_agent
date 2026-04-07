@@ -1,8 +1,8 @@
 import spacy
 import pandas as pd
 from pathlib import Path
-from spacy.pipeline import EntityRuler
 import feedparser
+from pyrosm import OSM
 
 from schemas.schema import EntityInfo, RssNormalizedSignal
 from processing.normalize_rss import normalize_rss_record
@@ -10,6 +10,8 @@ from processing.enrich import enrich_rss_signals
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GAZETTEER_CSV = PROJECT_ROOT / "gazetteer" / "Text" / "DomesticNames_KY.csv"
+
+ky_osm = OSM(str(PROJECT_ROOT / "kentucky-260404.osm.pbf"))
 
 nlp = spacy.load("en_core_web_trf")
 
@@ -36,7 +38,11 @@ def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
     return entities
 
 def geo_relevance(list_of_entities: list[EntityInfo]) -> float:
-    pass
+    for entity in list_of_entities:
+        if entity.label in ["GPE", "LOC", "FAC"]:
+            # Check to see if the geospatial entity is in the state
+            pass
+    return 0
 
 
 if __name__ == "__main__":

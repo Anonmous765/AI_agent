@@ -25,21 +25,25 @@ gazetteer = pd.read_csv(GAZETTEER_CSV)
 def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
     text = rss_signal.raw_text
     doc = nlp(text)
+    label_details = {
+        label: {
+            "label": label,
+            "explanation": spacy.explain(label),
+        }
+        for label in {ent.label_ for ent in doc.ents}
+    }
 
-    entities = []
-    for ent in doc.ents:
-        entities.append(
-            EntityInfo(
-                text=ent.text,
-                label=ent.label_,
-                explanation=spacy.explain(ent.label_),
-            )
+    return [
+        EntityInfo(
+            text=ent.text,
+            label=label_details[ent.label_],
         )
-    return entities
+        for ent in doc.ents
+    ]
 
 def geo_relevance(list_of_entities: list[EntityInfo]) -> float:
     for entity in list_of_entities:
-        if entity.label in ["GPE", "LOC", "FAC"]:
+        if entity.label["label"] in ["GPE", "LOC", "FAC"]:
             # Check to see if the geospatial entity is in the state
             pass
     return 0
@@ -73,7 +77,11 @@ if __name__ == "__main__":
             print("Extracted entities:")
             result = geo_info(signal)
             for entity in result:
-                print(f"{entity.text:<20} {entity.label:<12} {entity.explanation}")
+                print(
+                    f"{entity.text:<20} "
+                    f"{entity.label['label']:<12} "
+                    f"{entity.label['explanation']}"
+                )
             print(f"\nResult: {result}")
             print("\n")
         else:

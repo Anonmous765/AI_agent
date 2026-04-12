@@ -10,8 +10,7 @@ class EntityInfo:
     """Structured representation of a named entity extracted from text."""
 
     text: str
-    label: str
-    explanation: Optional[str]
+    label: dict[str, Optional[str]]
 
 
 @dataclass

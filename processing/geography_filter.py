@@ -1,17 +1,32 @@
-import spacy
-import pandas as pd
-from pathlib import Path
 import feedparser
+from pathlib import Path
+
+import pandas as pd
+import spacy
 from pyrosm import OSM
 
-from schemas.schema import EntityInfo, RssNormalizedSignal
-from processing.normalize_rss import normalize_rss_record
 from processing.enrich import enrich_rss_signals
+from processing.normalize_rss import normalize_rss_record
+from schemas.schema import EntityInfo, RssNormalizedSignal
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GAZETTEER_CSV = PROJECT_ROOT / "gazetteer" / "Text" / "DomesticNames_KY.csv"
 
 ky_osm = OSM(str(PROJECT_ROOT / "kentucky-260404.osm.pbf"))
+_osm_boundaries = ky_osm.get_boundaries()
+_osm_pois = ky_osm.get_pois()
+
+
+def _build_osm_name_set(gdf) -> set[str]:
+    if gdf is None or "name" not in gdf.columns:
+        return set()
+    return set(gdf["name"].dropna().str.lower().str.strip().tolist())
+
+
+OSM_NAMES: set[str] = (
+    _build_osm_name_set(_osm_boundaries) |
+    _build_osm_name_set(_osm_pois)
+)
 
 nlp = spacy.load("en_core_web_trf")
 
@@ -21,6 +36,9 @@ if not GAZETTEER_CSV.exists():
     raise FileNotFoundError(f"Gazetteer CSV not found at {GAZETTEER_CSV}")
 
 gazetteer = pd.read_csv(GAZETTEER_CSV)
+gazetteer["name_lower"] = gazetteer["FEATURE_NAME"].str.lower().str.strip()
+GAZETTEER_NAMES = gazetteer["name_lower"].tolist()
+
 
 def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
     text = rss_signal.raw_text
@@ -36,6 +54,7 @@ def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
             )
         )
     return entities
+
 
 def geo_relevance(list_of_entities: list[EntityInfo]) -> float:
     for entity in list_of_entities:

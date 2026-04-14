@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import spacy
 from pyrosm import OSM
+from rapidfuzz import process, fuzz
 
 from processing.enrich import enrich_rss_signals
 from processing.normalize_rss import normalize_rss_record
@@ -38,6 +39,7 @@ if not GAZETTEER_CSV.exists():
 gazetteer = pd.read_csv(GAZETTEER_CSV)
 gazetteer["name_lower"] = gazetteer["FEATURE_NAME"].str.lower().str.strip()
 GAZETTEER_NAMES = gazetteer["name_lower"].tolist()
+GAZETTEER_NAME_SET = set(GAZETTEER_NAMES)
 
 
 def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
@@ -60,12 +62,87 @@ def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
     ]
 
 
+# Weights for scoring components
+_EXACT_GAZETTEER_SCORE  = 1.0   # confirmed GNIS name
+_EXACT_OSM_SCORE        = 0.9   # confirmed OSM name
+_FUZZY_SCORE_SCALE      = 0.7   # fuzzy match is less certain
+_FUZZY_THRESHOLD        = 82    # rapidfuzz score cutoff (0–100)
+
+# Label weights — GPE (city/state) is most valuable for geo relevance
+_LABEL_WEIGHTS = {
+    "GPE": 1.0,   # geopolitical entity — city, state, country
+    "LOC": 0.85,  # non-GPE location — rivers, regions
+    "FAC": 0.75,  # facility — buildings, airports
+}
+
+_GEO_THRESHOLD = 0.2
+
+
+def _match_entity(entity_text: str) -> tuple[float, str]:
+    """
+    Try to match an entity string against the gazetteer and OSM name sets.
+    Returns (match_score, match_method) where match_score is in [0.0, 1.0].
+    """
+    normed = entity_text.lower().strip()
+
+    # 1. Exact match in GNIS gazetteer
+    if normed in GAZETTEER_NAME_SET:
+        return _EXACT_GAZETTEER_SCORE, "gazetteer_exact"
+
+    # 2. Exact match in OSM
+    if normed in OSM_NAMES:
+        return _EXACT_OSM_SCORE, "osm_exact"
+
+    # 3. Fuzzy match against gazetteer
+    result = process.extractOne(
+        normed,
+        GAZETTEER_NAMES,
+        scorer=fuzz.WRatio,
+        score_cutoff=_FUZZY_THRESHOLD,
+    )
+    if result:
+        _, score, _ = result
+        return (score / 100) * _FUZZY_SCORE_SCALE, "gazetteer_fuzzy"
+
+    return 0.0, "no_match"
+
+
 def geo_relevance(list_of_entities: list[EntityInfo]) -> float:
-    for entity in list_of_entities:
-        if entity.label["label"] in ["GPE", "LOC", "FAC"]:
-            # Check to see if the geospatial entity is in the state
-            pass
-    return 0
+    """
+    Compute a geographic relevance score for an article based on its
+    named entities, matched against the GNIS gazetteer and OSM data.
+
+    Args:
+        list_of_entities: List of EntityInfo objects from geo_info().
+
+    Returns:
+        A float in [0.0, 1.0]. Higher = more geographically relevant to Kentucky.
+    """
+    if not list_of_entities:
+        return 0.0
+
+    geo_entities = [
+        e for e in list_of_entities
+        if e.label["label"] in _LABEL_WEIGHTS
+    ]
+
+    if not geo_entities:
+        return 0.0
+
+    weighted_scores = []
+    for entity in geo_entities:
+        match_score, method = _match_entity(entity.text)
+        label_weight = _LABEL_WEIGHTS[entity.label["label"]]
+        weighted_scores.append(match_score * label_weight)
+
+    # Final score = mean of all weighted entity scores, capped at 1.0
+    final_score = min(sum(weighted_scores) / len(geo_entities), 1.0)
+    return round(final_score, 4)
+
+
+def geo_filter(rss_signal: RssNormalizedSignal, threshold: float = _GEO_THRESHOLD) -> bool:
+    """Return True when an RSS signal appears geographically relevant to Kentucky."""
+    return geo_relevance(geo_info(rss_signal)) >= threshold
 
 
 if __name__ == "__main__":

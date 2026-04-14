@@ -35,6 +35,7 @@ from schemas.schema import NoaaNormalizedSignal, RssNormalizedSignal
 from processing.enrich import enrich_rss_signals
 from memory.database import rss_signal_storage, query_db
 from processing.semantic_filter import classify_article
+from processing.geography_filter import geo_filter
 
 load_dotenv()
 
@@ -103,7 +104,8 @@ for region in RSS_FEEDS.values():
             signal = normalize_rss_record(entry, source)
             if signal:
                 relevance = classify_article(signal)["relevant"]
-                if relevance:
+                is_geo_relevant = geo_filter(signal)
+                if relevance and is_geo_relevant:
                     rss_signals.append(signal)
 # Add full text to each rss_signal and store in database
 rss_signals = enrich_rss_signals(rss_signals)

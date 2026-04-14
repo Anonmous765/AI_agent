@@ -1,17 +1,14 @@
 import feedparser
 from pathlib import Path
 
-import pandas as pd
 import spacy
 from pyrosm import OSM
-from rapidfuzz import process, fuzz
 
 from processing.enrich import enrich_rss_signals
 from processing.normalize_rss import normalize_rss_record
 from schemas.schema import EntityInfo, RssNormalizedSignal
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-GAZETTEER_CSV = PROJECT_ROOT / "gazetteer" / "Text" / "DomesticNames_KY.csv"
 
 ky_osm = OSM(str(PROJECT_ROOT / "kentucky-260404.osm.pbf"))
 _osm_boundaries = ky_osm.get_boundaries()
@@ -32,14 +29,6 @@ OSM_NAMES: set[str] = (
 nlp = spacy.load("en_core_web_trf")
 
 ruler = nlp.add_pipe("entity_ruler", before="ner")
-
-if not GAZETTEER_CSV.exists():
-    raise FileNotFoundError(f"Gazetteer CSV not found at {GAZETTEER_CSV}")
-
-gazetteer = pd.read_csv(GAZETTEER_CSV)
-gazetteer["name_lower"] = gazetteer["FEATURE_NAME"].str.lower().str.strip()
-GAZETTEER_NAMES = gazetteer["name_lower"].tolist()
-GAZETTEER_NAME_SET = set(GAZETTEER_NAMES)
 
 
 def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
@@ -63,10 +52,7 @@ def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
 
 
 # Weights for scoring components
-_EXACT_GAZETTEER_SCORE  = 1.0   # confirmed GNIS name
-_EXACT_OSM_SCORE        = 0.9   # confirmed OSM name
-_FUZZY_SCORE_SCALE      = 0.7   # fuzzy match is less certain
-_FUZZY_THRESHOLD        = 82    # rapidfuzz score cutoff (0–100)
+_EXACT_OSM_SCORE = 1.0   # confirmed OSM name
 
 # Label weights — GPE (city/state) is most valuable for geo relevance
 _LABEL_WEIGHTS = {
@@ -80,29 +66,14 @@ _GEO_THRESHOLD = 0.2
 
 def _match_entity(entity_text: str) -> tuple[float, str]:
     """
-    Try to match an entity string against the gazetteer and OSM name sets.
+    Try to match an entity string against the OSM name set.
     Returns (match_score, match_method) where match_score is in [0.0, 1.0].
     """
     normed = entity_text.lower().strip()
 
-    # 1. Exact match in GNIS gazetteer
-    if normed in GAZETTEER_NAME_SET:
-        return _EXACT_GAZETTEER_SCORE, "gazetteer_exact"
-
-    # 2. Exact match in OSM
+    # Exact match in OSM
     if normed in OSM_NAMES:
         return _EXACT_OSM_SCORE, "osm_exact"
-
-    # 3. Fuzzy match against gazetteer
-    result = process.extractOne(
-        normed,
-        GAZETTEER_NAMES,
-        scorer=fuzz.WRatio,
-        score_cutoff=_FUZZY_THRESHOLD,
-    )
-    if result:
-        _, score, _ = result
-        return (score / 100) * _FUZZY_SCORE_SCALE, "gazetteer_fuzzy"
 
     return 0.0, "no_match"
 
@@ -110,7 +81,7 @@ def _match_entity(entity_text: str) -> tuple[float, str]:
 def geo_relevance(list_of_entities: list[EntityInfo]) -> float:
     """
     Compute a geographic relevance score for an article based on its
-    named entities, matched against the GNIS gazetteer and OSM data.
+    named entities, matched against Kentucky OSM data.
 
     Args:
         list_of_entities: List of EntityInfo objects from geo_info().

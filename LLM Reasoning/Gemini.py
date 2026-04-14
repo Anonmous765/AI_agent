@@ -24,6 +24,7 @@ from dataclasses import asdict
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+import requests
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -93,27 +94,49 @@ def _signal_to_json(signal: RssNormalizedSignal | NoaaNormalizedSignal) -> str:
     return json.dumps(payload)
 
 
+def _load_rss_signals() -> list[RssNormalizedSignal]:
+    """Build the RSS context while tolerating source-specific failures."""
+    signals: list[RssNormalizedSignal] = []
+
+    for region in RSS_FEEDS.values():
+        for station in region.values():
+            try:
+                source, entries = fetch_raw_articles(station["url"])
+            except Exception as exc:  # noqa: BLE001
+                print(f"Warning: failed to fetch RSS feed {station['url']}: {exc}")
+                continue
+
+            for entry in entries:
+                signal = normalize_rss_record(entry, source)
+                if signal:
+                    relevance = classify_article(signal)["relevant"]
+                    is_geo_relevant = geo_filter(signal)
+                    if relevance and is_geo_relevant:
+                        signals.append(signal)
+
+    signals = enrich_rss_signals(signals)
+    rss_signal_storage(signals)
+    return signals
+
+
+def _load_noaa_signals() -> list[NoaaNormalizedSignal]:
+    """Build the NOAA context without crashing startup on transient API failures."""
+    try:
+        raw_alerts = fetch_raw_alerts()
+    except requests.RequestException as exc:
+        print(f"Warning: failed to fetch NOAA alerts: {exc}")
+        return []
+
+    signals: list[NoaaNormalizedSignal] = []
+    for props in raw_alerts:
+        signals.extend(normalize_noaa_record(props))
+    return signals
+
+
 # Ingestion + normalization
 
-rss_signals: list[RssNormalizedSignal] = []
-
-for region in RSS_FEEDS.values():
-    for station in region.values():
-        source, entries = fetch_raw_articles(station["url"])
-        for entry in entries:
-            signal = normalize_rss_record(entry, source)
-            if signal:
-                relevance = classify_article(signal)["relevant"]
-                is_geo_relevant = geo_filter(signal)
-                if relevance and is_geo_relevant:
-                    rss_signals.append(signal)
-# Add full text to each rss_signal and store in database
-rss_signals = enrich_rss_signals(rss_signals)
-rss_signal_storage(rss_signals)
-
-noaa_signals: list[NoaaNormalizedSignal] = []
-for props in fetch_raw_alerts():
-    noaa_signals.extend(normalize_noaa_record(props))
+rss_signals: list[RssNormalizedSignal] = _load_rss_signals()
+noaa_signals: list[NoaaNormalizedSignal] = _load_noaa_signals()
 
 
 # Seed Gemini chat history

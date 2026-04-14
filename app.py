@@ -20,7 +20,7 @@ GEMINI_PATH = PROJECT_ROOT / "LLM Reasoning" / "Gemini.py"
 
 
 def load_gemini_module():
-    """Load the existing Gemini.py file as a module without rewriting its logic."""
+    """Load the existing Gemini.py file as a module."""
     spec = importlib.util.spec_from_file_location("disasterai_gemini", GEMINI_PATH)
 
     if spec is None or spec.loader is None:
@@ -31,11 +31,9 @@ def load_gemini_module():
     return module
 
 
-# Import the existing Gemini module once at startup.
-# This reuses its ingestion, normalization, enrichment, database seeding,
-# history seeding, and chat session creation exactly as the script already does.
+# Import the Gemini module once at startup, then initialize the chat explicitly.
 gemini_module = load_gemini_module()
-chat = gemini_module.chat
+chat, rss_signals, noaa_signals = gemini_module.initialize_chat()
 
 # Protect the shared chat object so two HTTP requests do not call send_message at the same time.
 chat_lock = threading.Lock()
@@ -43,8 +41,8 @@ chat_lock = threading.Lock()
 
 # Print the same seeded rss_signal counts that Gemini.py prints in its CLI entry point.
 print(
-    f"Seeded context: {len(gemini_module.rss_signals)} RSS signal(s), "
-    f"{len(gemini_module.noaa_signals)} NOAA alert(s)."
+    f"Seeded context: {len(rss_signals)} RSS signal(s), "
+    f"{len(noaa_signals)} NOAA alert(s)."
 )
 
 

@@ -133,36 +133,53 @@ def _load_noaa_signals() -> list[NoaaNormalizedSignal]:
     return signals
 
 
-# Ingestion + normalization
+def load_signals() -> tuple[list[RssNormalizedSignal], list[NoaaNormalizedSignal]]:
+    """Load and normalize all RSS and NOAA signals."""
+    return _load_rss_signals(), _load_noaa_signals()
 
-rss_signals: list[RssNormalizedSignal] = _load_rss_signals()
-noaa_signals: list[NoaaNormalizedSignal] = _load_noaa_signals()
+
+def build_history(
+    rss_signals: list[RssNormalizedSignal],
+    noaa_signals: list[NoaaNormalizedSignal],
+) -> list[dict]:
+    """Build Gemini chat history from normalized signals."""
+    history: list[dict] = []
+    history.extend(
+        {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
+        for s in rss_signals
+    )
+    history.extend(
+        {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
+        for s in noaa_signals
+    )
+    return history
 
 
-# Seed Gemini chat history
+def create_chat(history: list[dict]):
+    """Create a Gemini chat session from prebuilt history."""
+    return client.chats.create(
+        model="gemini-3-flash-preview",
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=[query_db],
+        ),
+        history=history,
+    )
 
-history = []
-history.extend(
-    {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
-    for s in rss_signals
-)
-history.extend(
-    {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
-    for s in noaa_signals
-)
 
-chat = client.chats.create(
-    model="gemini-3-flash-preview",
-    config=types.GenerateContentConfig(system_instruction=system_prompt,
-                                       tools=[query_db]),
-    history=history,
-)
+def initialize_chat():
+    """Load signals, build chat history, and create the Gemini chat session."""
+    rss_signals, noaa_signals = load_signals()
+    history = build_history(rss_signals, noaa_signals)
+    chat = create_chat(history)
+    return chat, rss_signals, noaa_signals
 
-console = Console()
 
 # Interactive loop
 
 if __name__ == "__main__":
+    chat, rss_signals, noaa_signals = initialize_chat()
+    console = Console()
     print(f"Seeded context: {len(rss_signals)} RSS rss_signal(s), {len(noaa_signals)} NOAA alert(s).")
     while True:
         message = input("Enter a message: ")

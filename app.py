@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 
 
-# Load the .env file before the Gemini module is imported so the API key is available.
 load_dotenv()
 
 
@@ -33,17 +32,10 @@ def load_gemini_module():
 
 # Import the Gemini module once at startup, then initialize the chat explicitly.
 gemini_module = load_gemini_module()
-chat, rss_signals, noaa_signals = gemini_module.initialize_chat()
+chat = gemini_module.initialize_chat()
 
 # Protect the shared chat object so two HTTP requests do not call send_message at the same time.
 chat_lock = threading.Lock()
-
-
-# Print the same seeded rss_signal counts that Gemini.py prints in its CLI entry point.
-print(
-    f"Seeded context: {len(rss_signals)} RSS signal(s), "
-    f"{len(noaa_signals)} NOAA alert(s)."
-)
 
 
 app = Flask(__name__)

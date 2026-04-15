@@ -2,9 +2,8 @@
 Interactive Gemini-based situational awareness assistant.
 
 This script:
-- Fetches raw RSS and NOAA data via the ingestion layer.
-- Normalizes and filters signals via the normalization layer.
-- Seeds a Gemini chat session with the resulting signals.
+- Fetches raw RSS data at startup and stores it in the vector database.
+- Provides Gemini with tools to query the database and fetch live NOAA alerts.
 - Provides a CLI loop for user queries.
 
 Usage:
@@ -18,7 +17,6 @@ Environment:
 """
 
 import os
-import json
 from dataclasses import asdict
 
 from dotenv import load_dotenv
@@ -78,6 +76,13 @@ Your role is to interpret structured data related to weather events, natural dis
 - If no `link` field is present in the data, write: (Source: [name] - No link available)
 - Do not construct, infer, or guess any URL not present verbatim in the data.
 
+**Data Retrieval Tools:**
+You have access to two tools for retrieving situational data. Use them proactively — do not wait to be asked:
+- `query_db`: Search stored RSS news articles in the vector database. Use this to find relevant news reports, historical context, or specific incidents whenever a user asks about current events.
+- `fetch_noaa_alerts`: Fetch live, active weather alerts from the National Weather Service. Use this whenever the user asks about weather warnings, watches, advisories, or emergency alerts.
+
+Always call one or both tools to gather relevant data before formulating your answer. Do not answer from memory or prior context alone.
+
 **Output Style:**
 - Keep the output concise, factual, and actionable when possible.
 - Focus only on Kentucky-relevant developments.
@@ -85,17 +90,8 @@ Your role is to interpret structured data related to weather events, natural dis
 """
 
 
-# Serialization helpers
-
-def _signal_to_json(signal: RssNormalizedSignal | NoaaNormalizedSignal) -> str:
-    """Serialize any normalized rss_signal to a JSON string with ISO 8601 timestamp."""
-    payload = asdict(signal)
-    payload["timestamp"] = signal.timestamp.isoformat()
-    return json.dumps(payload)
-
-
-def _load_rss_signals() -> list[RssNormalizedSignal]:
-    """Build the RSS context while tolerating source-specific failures."""
+def _populate_rss_database() -> int:
+    """Fetch, filter, enrich, and store RSS signals in the vector DB. Returns count stored."""
     signals: list[RssNormalizedSignal] = []
 
     for region in RSS_FEEDS.values():
@@ -116,71 +112,66 @@ def _load_rss_signals() -> list[RssNormalizedSignal]:
 
     signals = enrich_rss_signals(signals)
     rss_signal_storage(signals)
-    return signals
+    return len(signals)
 
 
-def _load_noaa_signals() -> list[NoaaNormalizedSignal]:
-    """Build the NOAA context without crashing startup on transient API failures."""
+def fetch_noaa_alerts() -> dict:
+    """
+    Fetches all live, active NOAA/NWS weather alerts for Kentucky.
+
+    Use this tool whenever the user asks about current weather warnings, watches,
+    advisories, or active emergency alerts. This tool reaches out to the National
+    Weather Service API in real time and returns the latest data for the entire state.
+
+    Returns:
+        A dictionary with:
+        - "count": total number of active alerts.
+        - "alerts": list of alert dicts, each with source, county, signal_type,
+                    severity, timestamp (ISO 8601), confidence, and raw_text.
+    """
+    print("[TOOL CALLED] fetch_noaa_alerts()")
+
     try:
         raw_alerts = fetch_raw_alerts()
     except requests.RequestException as exc:
-        print(f"Warning: failed to fetch NOAA alerts: {exc}")
-        return []
+        return {"error": str(exc), "count": 0, "alerts": []}
 
     signals: list[NoaaNormalizedSignal] = []
     for props in raw_alerts:
         signals.extend(normalize_noaa_record(props))
-    return signals
+
+    alerts = []
+    for s in signals:
+        payload = asdict(s)
+        payload["timestamp"] = s.timestamp.isoformat()
+        alerts.append(payload)
+
+    return {"count": len(alerts), "alerts": alerts}
 
 
-def load_signals() -> tuple[list[RssNormalizedSignal], list[NoaaNormalizedSignal]]:
-    """Load and normalize all RSS and NOAA signals."""
-    return _load_rss_signals(), _load_noaa_signals()
-
-
-def build_history(
-    rss_signals: list[RssNormalizedSignal],
-    noaa_signals: list[NoaaNormalizedSignal],
-) -> list[dict]:
-    """Build Gemini chat history from normalized signals."""
-    history: list[dict] = []
-    history.extend(
-        {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
-        for s in rss_signals
-    )
-    history.extend(
-        {"role": "user", "parts": [{"text": _signal_to_json(s)}]}
-        for s in noaa_signals
-    )
-    return history
-
-
-def create_chat(history: list[dict]):
-    """Create a Gemini chat session from prebuilt history."""
+def create_chat():
+    """Create a Gemini chat session with all data-retrieval tools registered."""
     return client.chats.create(
         model="gemini-3-flash-preview",
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            tools=[query_db],
+            tools=[query_db, fetch_noaa_alerts],
         ),
-        history=history,
     )
 
 
 def initialize_chat():
-    """Load signals, build chat history, and create the Gemini chat session."""
-    rss_signals, noaa_signals = load_signals()
-    history = build_history(rss_signals, noaa_signals)
-    chat = create_chat(history)
-    return chat, rss_signals, noaa_signals
+    """Populate the RSS database and create the Gemini chat session."""
+    count = _populate_rss_database()
+    print(f"Startup: stored {count} RSS signal(s) in the vector database.")
+    return create_chat()
 
 
 # Interactive loop
 
 if __name__ == "__main__":
-    chat, rss_signals, noaa_signals = initialize_chat()
+    chat = initialize_chat()
     console = Console()
-    print(f"Seeded context: {len(rss_signals)} RSS rss_signal(s), {len(noaa_signals)} NOAA alert(s).")
     while True:
         message = input("Enter a message: ")
         if message.lower() == "exit":

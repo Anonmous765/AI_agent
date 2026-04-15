@@ -161,9 +161,145 @@
             color: #93c5fd;
         }
 
-        /* Style the temporary thinking state with a lighter tone so it feels unobtrusive. */
+        /* Give the loading bubble a slightly richer surface so it feels distinct from a normal reply. */
         .thinking {
-            color: #9ca3af;
+            align-items: center;
+            background:
+                radial-gradient(circle at top left, rgba(96, 165, 250, 0.16), transparent 45%),
+                linear-gradient(135deg, #151c28, #101722);
+            border-color: #334155;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.3);
+            color: #cbd5e1;
+            display: inline-flex;
+            gap: 0.9rem;
+            min-width: 220px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Add a gentle sheen that moves across the bubble while the assistant is working. */
+        .thinking::before {
+            animation: thinking-sheen 2.8s linear infinite;
+            background: linear-gradient(115deg, transparent 25%, rgba(148, 163, 184, 0.12) 50%, transparent 75%);
+            content: "";
+            inset: 0;
+            position: absolute;
+            transform: translateX(-100%);
+        }
+
+        /* Keep the animated content above the moving sheen. */
+        .thinking > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* The pulse ring and dots create a compact "assistant is working" signal. */
+        .thinking-visual {
+            align-items: center;
+            display: flex;
+            gap: 0.55rem;
+        }
+
+        /* This pulse gives the left indicator a soft breathing motion. */
+        .thinking-orb {
+            animation: thinking-pulse 1.8s ease-in-out infinite;
+            background: radial-gradient(circle at 30% 30%, #bfdbfe, #60a5fa 55%, #1d4ed8 100%);
+            border-radius: 999px;
+            box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.45);
+            flex-shrink: 0;
+            height: 12px;
+            width: 12px;
+        }
+
+        /* These dots rise in sequence so the state feels active without being loud. */
+        .thinking-dots {
+            align-items: flex-end;
+            display: flex;
+            gap: 0.3rem;
+            height: 14px;
+        }
+
+        .thinking-dot {
+            animation: thinking-dot-bounce 1s ease-in-out infinite;
+            background-color: rgba(191, 219, 254, 0.9);
+            border-radius: 999px;
+            display: block;
+            height: 6px;
+            opacity: 0.45;
+            transform-origin: bottom center;
+            width: 6px;
+        }
+
+        .thinking-dot:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .thinking-dot:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        /* Group the label and helper copy so the state reads cleanly. */
+        .thinking-copy {
+            display: grid;
+            gap: 0.08rem;
+        }
+
+        .thinking-label {
+            color: #f8fafc;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .thinking-caption {
+            color: #94a3b8;
+            font-size: 0.78rem;
+        }
+
+        @keyframes thinking-dot-bounce {
+            0%,
+            80%,
+            100% {
+                opacity: 0.4;
+                transform: translateY(0) scaleY(1);
+            }
+
+            40% {
+                opacity: 1;
+                transform: translateY(-4px) scaleY(1.15);
+            }
+        }
+
+        @keyframes thinking-pulse {
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.15);
+                transform: scale(1);
+            }
+
+            50% {
+                box-shadow: 0 0 0 12px rgba(96, 165, 250, 0);
+                transform: scale(1.08);
+            }
+        }
+
+        @keyframes thinking-sheen {
+            from {
+                transform: translateX(-100%);
+            }
+
+            to {
+                transform: translateX(100%);
+            }
+        }
+
+        /* Respect reduced-motion users by keeping the richer layout without the looping motion. */
+        @media (prefers-reduced-motion: reduce) {
+            .thinking::before,
+            .thinking-orb,
+            .thinking-dot {
+                animation: none;
+            }
         }
 
         /* Keep the message composer pinned to the bottom of the interface. */
@@ -335,7 +471,22 @@
 
         var bubble = document.createElement("div");
         bubble.className = "message-bubble thinking";
-        bubble.textContent = "Thinking...";
+        bubble.setAttribute("role", "status");
+        bubble.setAttribute("aria-live", "polite");
+        bubble.innerHTML = [
+            '<div class="thinking-visual" aria-hidden="true">',
+            '    <span class="thinking-orb"></span>',
+            '    <div class="thinking-dots">',
+            '        <span class="thinking-dot"></span>',
+            '        <span class="thinking-dot"></span>',
+            '        <span class="thinking-dot"></span>',
+            "    </div>",
+            "</div>",
+            '<div class="thinking-copy">',
+            '    <span class="thinking-label">Thinking</span>',
+            '    <span class="thinking-caption">Analyzing the latest context and preparing a reply.</span>',
+            "</div>"
+        ].join("");
 
         thinkingRow.appendChild(bubble);
         chatLog.appendChild(thinkingRow);

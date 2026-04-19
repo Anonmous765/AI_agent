@@ -17,6 +17,7 @@ testing.ipynb
 
 # Database
 .chroma_db
+database/chat_store.sqlite3
 
 # Local data
 gazetteer/

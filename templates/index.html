@@ -191,29 +191,84 @@
 
         .history-group { margin-bottom: 1.25rem; }
 
+        .history-header {
+            align-items: center;
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.4rem;
+        }
+
         .history-label {
             color: var(--text-faint);
             font-size: 0.75rem;
             font-weight: 600;
             letter-spacing: 0.03em;
-            margin-bottom: 0.4rem;
             padding-left: 0.75rem;
             text-transform: uppercase;
         }
 
         .history-item {
+            align-items: center;
             border-radius: 8px;
             color: var(--text-muted);
             cursor: pointer;
+            display: flex;
             font-size: 0.85rem;
-            overflow: hidden;
+            gap: 0.5rem;
             padding: 0.45rem 0.75rem;
             text-overflow: ellipsis;
             transition: background 0.15s, color 0.15s;
-            white-space: nowrap;
         }
 
         .history-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+        .history-item.active { background: var(--accent-bg); color: var(--accent-text); }
+
+        .history-item-title {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-item-delete {
+            color: inherit;
+            flex-shrink: 0;
+            opacity: 0;
+            padding: 0.25rem;
+        }
+
+        .history-item:hover .history-item-delete,
+        .history-item.active .history-item-delete,
+        .history-item-delete:focus-visible {
+            opacity: 1;
+        }
+
+        .history-item-delete:hover { background: var(--bg-surface); }
+
+        .history-title-input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            flex: 1;
+            font-family: inherit;
+            font-size: inherit;
+            min-width: 0;
+            outline: none;
+        }
+
+        .history-empty {
+            color: var(--text-faint);
+            font-size: 0.82rem;
+            padding: 0.45rem 0.75rem;
+        }
+
+        .history-create-btn {
+            color: var(--text-faint);
+            flex-shrink: 0;
+            padding: 0.35rem;
+        }
 
         /* ── Theme toggle ── */
         .sidebar-footer {
@@ -632,17 +687,17 @@
     </nav>
 
     <div class="history-group">
-        <div class="history-label">Recent</div>
-        <div class="history-item">What's the latest NOAA alert...</div>
-        <div class="history-item">Show me damage reports for...</div>
-        <div class="history-item">Flood warnings in eastern KY...</div>
-    </div>
-
-    <div class="history-group">
-        <div class="history-label">7 Days Ago</div>
-        <div class="history-item">Storm path analysis for...</div>
-        <div class="history-item">How are relief efforts going...</div>
-        <div class="history-item">What counties were impacted...</div>
+        <div class="history-header">
+            <div class="history-label">Sessions</div>
+            <button class="icon-btn history-create-btn" id="newSessionButton" type="button" title="New chat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+            </button>
+        </div>
+        <div id="sessionList" aria-label="Saved chat sessions"></div>
+        <div class="history-empty" id="sessionEmptyState">No saved chats yet.</div>
     </div>
 
     <!-- Theme toggle at bottom of sidebar -->
@@ -742,9 +797,15 @@
     var welcomeScreen = document.getElementById("welcomeScreen");
     var chatArea = document.getElementById("chatArea");
     var themeToggle = document.getElementById("themeToggle");
+    var sessionList = document.getElementById("sessionList");
+    var sessionEmptyState = document.getElementById("sessionEmptyState");
+    var newSessionButton = document.getElementById("newSessionButton");
 
     var thinkingRow = null;
     var firstMessage = true;
+    var sessions = [];
+    var currentSessionId = null;
+    var isSubmitting = false;
 
     marked.setOptions({ breaks: true, gfm: true });
 
@@ -783,6 +844,49 @@
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
+    function sortSessions(list) {
+        return list.slice().sort(function(a, b) {
+            return new Date(b.updated_at) - new Date(a.updated_at);
+        });
+    }
+
+    function findSession(sessionId) {
+        return sessions.find(function(session) {
+            return session.id === sessionId;
+        }) || null;
+    }
+
+    function upsertSession(session) {
+        if (!session) return;
+        var index = sessions.findIndex(function(item) {
+            return item.id === session.id;
+        });
+
+        if (index === -1) {
+            sessions.push(session);
+        } else {
+            sessions[index] = session;
+        }
+
+        sessions = sortSessions(sessions);
+        renderSessions();
+    }
+
+    function removeSession(sessionId) {
+        sessions = sessions.filter(function(session) {
+            return session.id !== sessionId;
+        });
+        renderSessions();
+    }
+
+    function resetConversation() {
+        hideThinkingIndicator();
+        chatLog.innerHTML = "";
+        chatArea.classList.remove("active");
+        welcomeScreen.style.display = "flex";
+        firstMessage = true;
+    }
+
     function switchToChat() {
         if (firstMessage) {
             welcomeScreen.style.display = "none";
@@ -808,6 +912,20 @@
         chatLog.appendChild(row);
         scrollChatToBottom();
         return row;
+    }
+
+    function renderMessages(messages) {
+        hideThinkingIndicator();
+        chatLog.innerHTML = "";
+
+        if (!messages.length) {
+            resetConversation();
+            return;
+        }
+
+        messages.forEach(function(message) {
+            addMessage(message.role, message.content, message.role === "assistant");
+        });
     }
 
     function showThinkingIndicator() {
@@ -849,36 +967,250 @@
     function setComposerState(isBusy) {
         messageInput.disabled = isBusy;
         sendButton.disabled = isBusy;
+        newSessionButton.disabled = isBusy;
         if (!isBusy) messageInput.focus();
+    }
+
+    async function requestJson(url, options) {
+        var response = await fetch(url, options);
+        var payload = {};
+
+        try {
+            payload = await response.json();
+        } catch (error) {
+            payload = {};
+        }
+
+        if (!response.ok) {
+            throw new Error(payload.error || "The server returned an unexpected error.");
+        }
+
+        return payload;
+    }
+
+    function renderSessions() {
+        sessionList.innerHTML = "";
+        sessionEmptyState.style.display = sessions.length ? "none" : "block";
+
+        sessions.forEach(function(session) {
+            var item = document.createElement("div");
+            var title = document.createElement("span");
+            var deleteButton = document.createElement("button");
+
+            item.className = "history-item";
+            if (session.id === currentSessionId) {
+                item.classList.add("active");
+            }
+            item.tabIndex = 0;
+            item.setAttribute("role", "button");
+            item.setAttribute("aria-label", "Load session " + session.title);
+
+            title.className = "history-item-title";
+            title.textContent = session.title;
+
+            deleteButton.className = "icon-btn history-item-delete";
+            deleteButton.type = "button";
+            deleteButton.title = "Delete chat";
+            deleteButton.innerHTML = [
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">',
+                '  <polyline points="3 6 5 6 21 6"></polyline>',
+                '  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>',
+                '  <path d="M10 11v6"></path>',
+                '  <path d="M14 11v6"></path>',
+                '  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>',
+                '</svg>'
+            ].join("");
+
+            item.addEventListener("click", function() {
+                loadSession(session.id);
+            });
+
+            item.addEventListener("keydown", function(event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    loadSession(session.id);
+                }
+            });
+
+            title.addEventListener("dblclick", function(event) {
+                event.stopPropagation();
+                beginRenameSession(session, item, title);
+            });
+
+            deleteButton.addEventListener("click", function(event) {
+                event.stopPropagation();
+                handleDeleteSession(session.id);
+            });
+
+            item.appendChild(title);
+            item.appendChild(deleteButton);
+            sessionList.appendChild(item);
+        });
+    }
+
+    function beginRenameSession(session, item, titleNode) {
+        if (isSubmitting) return;
+        if (item.querySelector(".history-title-input")) return;
+
+        var input = document.createElement("input");
+        input.className = "history-title-input";
+        input.type = "text";
+        input.value = session.title;
+
+        function restoreTitle() {
+            if (input.parentNode === item) {
+                item.replaceChild(titleNode, input);
+            }
+        }
+
+        async function commitRename() {
+            var nextTitle = input.value.trim();
+            restoreTitle();
+            if (!nextTitle || nextTitle === session.title) return;
+
+            try {
+                var payload = await requestJson("/sessions/" + encodeURIComponent(session.id), {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: nextTitle })
+                });
+                upsertSession(payload.session);
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        input.addEventListener("click", function(event) {
+            event.stopPropagation();
+        });
+
+        input.addEventListener("keydown", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                input.blur();
+            }
+            if (event.key === "Escape") {
+                restoreTitle();
+            }
+        });
+
+        input.addEventListener("blur", commitRename);
+        item.replaceChild(input, titleNode);
+        input.focus();
+        input.select();
+    }
+
+    async function loadSessions(preferredSessionId) {
+        var payload = await requestJson("/sessions");
+        sessions = sortSessions(payload.sessions || []);
+
+        if (preferredSessionId && findSession(preferredSessionId)) {
+            currentSessionId = preferredSessionId;
+        } else if (currentSessionId && !findSession(currentSessionId)) {
+            currentSessionId = null;
+        }
+
+        renderSessions();
+    }
+
+    async function createNewSession(options) {
+        options = options || {};
+        var payload = await requestJson("/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+        });
+
+        currentSessionId = payload.id;
+        upsertSession(payload.session);
+
+        if (options.resetConversation !== false) {
+            resetConversation();
+        }
+
+        return payload.session;
+    }
+
+    async function ensureSession() {
+        if (currentSessionId) {
+            return currentSessionId;
+        }
+
+        var session = await createNewSession({ resetConversation: false });
+        if (!session) {
+            throw new Error("Unable to create a new session right now.");
+        }
+        return session.id;
+    }
+
+    async function loadSession(sessionId) {
+        if (!sessionId || isSubmitting) {
+            return;
+        }
+
+        var payload = await requestJson("/sessions/" + encodeURIComponent(sessionId));
+        currentSessionId = payload.session.id;
+        upsertSession(payload.session);
+        renderMessages(payload.messages || []);
+    }
+
+    async function handleDeleteSession(sessionId) {
+        if (isSubmitting) return;
+        var existing = findSession(sessionId);
+        if (!existing) return;
+
+        if (!window.confirm('Delete "' + existing.title + '"?')) {
+            return;
+        }
+
+        await requestJson("/sessions/" + encodeURIComponent(sessionId), {
+            method: "DELETE"
+        });
+
+        removeSession(sessionId);
+
+        if (currentSessionId === sessionId) {
+            currentSessionId = null;
+            resetConversation();
+            if (sessions.length) {
+                await loadSession(sessions[0].id);
+            }
+        }
     }
 
     async function submitMessage(event) {
         event.preventDefault();
         var message = messageInput.value.trim();
-        if (!message) return;
-
-        addMessage("user", message, false);
-        messageInput.value = "";
-        messageInput.style.height = "auto";
-        setComposerState(true);
-        showThinkingIndicator();
+        if (!message || isSubmitting) return;
 
         try {
-            var response = await fetch("/chat", {
+            isSubmitting = true;
+            var sessionId = await ensureSession();
+
+            addMessage("user", message, false);
+            messageInput.value = "";
+            messageInput.style.height = "auto";
+            setComposerState(true);
+            showThinkingIndicator();
+
+            var payload = await requestJson("/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({
+                    message: message,
+                    session_id: sessionId
+                })
             });
-
-            var payload = await response.json();
-            if (!response.ok) throw new Error(payload.error || "The server returned an unexpected error.");
 
             hideThinkingIndicator();
             addMessage("assistant", payload.reply, true);
+            currentSessionId = payload.session_id;
+            upsertSession(payload.session);
         } catch (error) {
             hideThinkingIndicator();
             addMessage("assistant", "Unable to get a reply.\n\n" + error.message, true);
         } finally {
+            isSubmitting = false;
             setComposerState(false);
         }
     }
@@ -897,7 +1229,24 @@
 
     chatForm.addEventListener("submit", submitMessage);
     messageInput.addEventListener("keydown", handleComposerKeydown);
-    messageInput.focus();
+    newSessionButton.addEventListener("click", function() {
+        if (isSubmitting) return;
+        createNewSession();
+    });
+
+    loadSessions()
+        .then(function() {
+            if (sessions.length) {
+                return loadSession(sessions[0].id);
+            }
+            resetConversation();
+        })
+        .catch(function(error) {
+            addMessage("assistant", "Unable to load chat sessions.\n\n" + error.message, true);
+        })
+        .finally(function() {
+            messageInput.focus();
+        });
 </script>
 </body>
 </html>

@@ -102,10 +102,10 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding: 1.5rem 1.25rem;
-            width: 272px;
+            padding: 1.25rem 1rem;
+            width: 260px;
             flex-shrink: 0;
-            overflow-y: auto;
+            overflow: hidden;
             transition: background 0.25s, border-color 0.25s;
         }
 
@@ -170,42 +170,68 @@
             transition: background 0.25s, border-color 0.25s;
         }
 
-        .nav-section { margin-bottom: 1.5rem; }
-
-        .nav-item {
-            align-items: center;
-            border-radius: 10px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            font-size: 0.9rem;
-            font-weight: 500;
-            gap: 0.65rem;
-            padding: 0.6rem 0.75rem;
-            transition: background 0.15s, color 0.15s;
-        }
-
-        .nav-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-        .nav-item.active { background: var(--accent-bg); color: var(--accent-text); }
-        .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-
-        .history-group { margin-bottom: 1.25rem; }
+        .history-group { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 1rem; }
 
         .history-header {
             align-items: center;
+            background: var(--bg-surface-hover);
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            cursor: pointer;
             display: flex;
             justify-content: space-between;
             gap: 0.5rem;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0;
+            padding: 0.55rem 0.75rem;
+            transition: background 0.15s, border-color 0.15s;
+            user-select: none;
         }
 
-        .history-label {
+        .history-header:hover { background: var(--bg-input); }
+
+        .history-header-left {
+            align-items: center;
+            display: flex;
+            gap: 0.55rem;
+        }
+
+        .history-chevron {
             color: var(--text-faint);
-            font-size: 0.75rem;
+            transition: transform 0.25s ease;
+            flex-shrink: 0;
+        }
+
+        .history-header.open .history-chevron { transform: rotate(180deg); }
+
+        .history-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
             font-weight: 600;
-            letter-spacing: 0.03em;
-            padding-left: 0.75rem;
-            text-transform: uppercase;
+            letter-spacing: 0;
+        }
+
+        .history-count {
+            background: var(--accent-bg);
+            border-radius: 999px;
+            color: var(--accent-text);
+            font-size: 0.7rem;
+            font-weight: 600;
+            min-width: 18px;
+            padding: 0.05rem 0.45rem;
+            text-align: center;
+        }
+
+        .history-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, margin-top 0.25s ease;
+            margin-top: 0;
+        }
+
+        .history-body.open {
+            max-height: 600px;
+            margin-top: 0.4rem;
+            overflow-y: auto;
         }
 
         .history-item {
@@ -460,17 +486,40 @@
         }
         .message-bubble a { color: var(--accent); }
 
+        /* ── Typing cursor ── */
+        .typing-cursor {
+            animation: cursor-blink 0.65s ease-in-out infinite;
+            background: var(--text-muted);
+            border-radius: 1px;
+            display: inline-block;
+            height: 1.1em;
+            margin-left: 2px;
+            vertical-align: text-bottom;
+            width: 2px;
+        }
+
+        @keyframes cursor-blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
         /* ── Thinking indicator ── */
         .thinking {
-            align-items: center;
             background: var(--bg-assistant-bubble);
             border: 1px solid var(--border-assistant);
             box-shadow: 0 2px 12px var(--shadow-sm);
             display: inline-flex;
-            gap: 0.75rem;
-            min-width: 200px;
+            flex-direction: column;
+            gap: 0;
+            min-width: 240px;
             overflow: hidden;
             position: relative;
+        }
+
+        .thinking-main {
+            align-items: center;
+            display: flex;
+            gap: 0.75rem;
         }
 
         .thinking::before {
@@ -527,8 +576,68 @@
             to { transform: translateX(100%); }
         }
 
+        /* ── Thinking steps ── */
+        .thinking-steps {
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-top: 0.7rem;
+            padding-top: 0.6rem;
+        }
+
+        .thinking-step {
+            align-items: center;
+            display: flex;
+            font-size: 0.8rem;
+            gap: 0.5rem;
+        }
+
+        .thinking-step-dot {
+            border-radius: 50%;
+            flex-shrink: 0;
+            height: 7px;
+            width: 7px;
+            transition: background 0.3s;
+        }
+
+        .thinking-step.running .thinking-step-dot {
+            animation: step-pulse 1s ease-in-out infinite;
+            background: var(--accent);
+        }
+
+        .thinking-step.done .thinking-step-dot {
+            animation: none;
+            background: #22c55e;
+        }
+
+        @keyframes step-pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.3); }
+        }
+
+        .thinking-step-label {
+            color: var(--text-muted);
+            transition: color 0.3s;
+        }
+
+        .thinking-step.done .thinking-step-label {
+            color: var(--text-secondary);
+        }
+
+        .thinking-step-check {
+            color: #22c55e;
+            font-size: 0.7rem;
+            margin-left: auto;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .thinking-step.done .thinking-step-check { opacity: 1; }
+
         @media (prefers-reduced-motion: reduce) {
-            .thinking::before, .thinking-orb, .thinking-dot, .welcome-orb { animation: none; }
+            .thinking::before, .thinking-orb, .thinking-dot, .welcome-orb,
+            .thinking-step-dot, .typing-cursor { animation: none; }
         }
 
         /* ── Composer ── */
@@ -651,53 +760,31 @@
         <span class="brand-name">DisasterAI</span>
     </div>
 
-    <div class="search-box">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input type="text" placeholder="Search" readonly>
-        <span class="kbd">&#8984;K</span>
-    </div>
-
-    <nav class="nav-section">
-        <div class="nav-item active">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            Home
-        </div>
-        <div class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-            Explore
-        </div>
-        <div class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-            </svg>
-            Library
-        </div>
-        <div class="nav-item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            History
-        </div>
-    </nav>
-
     <div class="history-group">
-        <div class="history-header">
-            <div class="history-label">Sessions</div>
-            <button class="icon-btn history-create-btn" id="newSessionButton" type="button" title="New chat">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
+        <div class="history-header open" id="historyToggle" role="button" aria-expanded="true" aria-controls="historyBody">
+            <div class="history-header-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" color="var(--text-muted)">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
-            </button>
+                <span class="history-label">Chat History</span>
+                <span class="history-count" id="historyCount">0</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.35rem;">
+                <button class="icon-btn history-create-btn" id="newSessionButton" type="button" title="New chat" onclick="event.stopPropagation()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <svg class="history-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
         </div>
-        <div id="sessionList" aria-label="Saved chat sessions"></div>
-        <div class="history-empty" id="sessionEmptyState">No saved chats yet.</div>
+        <div class="history-body open" id="historyBody" aria-label="Saved chat sessions">
+            <div id="sessionList"></div>
+            <div class="history-empty" id="sessionEmptyState">No saved chats yet.</div>
+        </div>
     </div>
 
     <!-- Theme toggle at bottom of sidebar -->
@@ -928,6 +1015,8 @@
         });
     }
 
+    var thinkingSteps = {};
+
     function showThinkingIndicator() {
         switchToChat();
         thinkingRow = document.createElement("article");
@@ -938,17 +1027,19 @@
         bubble.setAttribute("role", "status");
         bubble.setAttribute("aria-live", "polite");
         bubble.innerHTML = [
-            '<div class="thinking-visual" aria-hidden="true">',
-            '  <span class="thinking-orb"></span>',
-            '  <div class="thinking-dots">',
-            '    <span class="thinking-dot"></span>',
-            '    <span class="thinking-dot"></span>',
-            '    <span class="thinking-dot"></span>',
+            '<div class="thinking-main">',
+            '  <div class="thinking-visual" aria-hidden="true">',
+            '    <span class="thinking-orb"></span>',
+            '    <div class="thinking-dots">',
+            '      <span class="thinking-dot"></span>',
+            '      <span class="thinking-dot"></span>',
+            '      <span class="thinking-dot"></span>',
+            '    </div>',
             '  </div>',
-            '</div>',
-            '<div class="thinking-copy">',
-            '  <span class="thinking-label">Thinking</span>',
-            '  <span class="thinking-caption">Analyzing the latest context and preparing a reply.</span>',
+            '  <div class="thinking-copy">',
+            '    <span class="thinking-label">Thinking</span>',
+            '    <span class="thinking-caption">Analyzing context and preparing a reply.</span>',
+            '  </div>',
             '</div>'
         ].join("");
 
@@ -957,11 +1048,43 @@
         scrollChatToBottom();
     }
 
+    function addThinkingStep(name, label) {
+        if (!thinkingRow) return;
+        var bubble = thinkingRow.querySelector(".message-bubble");
+        var stepsEl = bubble.querySelector(".thinking-steps");
+        if (!stepsEl) {
+            stepsEl = document.createElement("div");
+            stepsEl.className = "thinking-steps";
+            bubble.appendChild(stepsEl);
+        }
+        var step = document.createElement("div");
+        step.className = "thinking-step running";
+        step.innerHTML = [
+            '<span class="thinking-step-dot"></span>',
+            '<span class="thinking-step-label">' + label + '…</span>',
+            '<span class="thinking-step-check">✓</span>'
+        ].join("");
+        stepsEl.appendChild(step);
+        thinkingSteps[name] = step;
+        scrollChatToBottom();
+    }
+
+    function completeThinkingStep(name) {
+        var step = thinkingSteps[name];
+        if (step) {
+            step.classList.remove("running");
+            step.classList.add("done");
+            step.querySelector(".thinking-step-label").textContent =
+                step.querySelector(".thinking-step-label").textContent.replace("…", "");
+        }
+    }
+
     function hideThinkingIndicator() {
         if (thinkingRow) {
             thinkingRow.remove();
             thinkingRow = null;
         }
+        thinkingSteps = {};
     }
 
     function setComposerState(isBusy) {
@@ -988,9 +1111,21 @@
         return payload;
     }
 
+    // ── History toggle ──
+    var historyToggle = document.getElementById("historyToggle");
+    var historyBody = document.getElementById("historyBody");
+    var historyCount = document.getElementById("historyCount");
+
+    historyToggle.addEventListener("click", function() {
+        var isOpen = historyToggle.classList.toggle("open");
+        historyBody.classList.toggle("open", isOpen);
+        historyToggle.setAttribute("aria-expanded", isOpen);
+    });
+
     function renderSessions() {
         sessionList.innerHTML = "";
         sessionEmptyState.style.display = sessions.length ? "none" : "block";
+        historyCount.textContent = sessions.length;
 
         sessions.forEach(function(session) {
             var item = document.createElement("div");
@@ -1183,8 +1318,11 @@
         var message = messageInput.value.trim();
         if (!message || isSubmitting) return;
 
+        isSubmitting = true;
+        var assistantBubble = null;
+        var rawReply = "";
+
         try {
-            isSubmitting = true;
             var sessionId = await ensureSession();
 
             addMessage("user", message, false);
@@ -1193,19 +1331,91 @@
             setComposerState(true);
             showThinkingIndicator();
 
-            var payload = await requestJson("/chat", {
+            var response = await fetch("/chat/stream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    message: message,
-                    session_id: sessionId
-                })
+                body: JSON.stringify({ message: message, session_id: sessionId })
             });
 
-            hideThinkingIndicator();
-            addMessage("assistant", payload.reply, true);
-            currentSessionId = payload.session_id;
-            upsertSession(payload.session);
+            if (!response.ok) {
+                var errPayload = await response.json().catch(function() { return {}; });
+                throw new Error(errPayload.error || "Server error.");
+            }
+
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = "";
+
+            while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+
+                buffer += decoder.decode(chunk.value, { stream: true });
+
+                // Split on double-newline (SSE message boundary)
+                var parts = buffer.split("\n\n");
+                buffer = parts.pop();
+
+                for (var i = 0; i < parts.length; i++) {
+                    var part = parts[i].trim();
+                    if (!part) continue;
+
+                    var eventType = "message";
+                    var eventData = "";
+
+                    part.split("\n").forEach(function(line) {
+                        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+                        else if (line.startsWith("data: ")) eventData = line.slice(6).trim();
+                    });
+
+                    if (!eventData) continue;
+                    var data = JSON.parse(eventData);
+
+                    if (eventType === "tool_call") {
+                        addThinkingStep(data.name, data.label);
+
+                    } else if (eventType === "tool_done") {
+                        completeThinkingStep(data.name);
+
+                    } else if (eventType === "text") {
+                        if (!assistantBubble) {
+                            hideThinkingIndicator();
+                            switchToChat();
+                            var row = document.createElement("article");
+                            row.className = "message-row assistant";
+                            var bubble = document.createElement("div");
+                            bubble.className = "message-bubble";
+                            row.appendChild(bubble);
+                            chatLog.appendChild(row);
+                            assistantBubble = bubble;
+                        }
+                        rawReply += data.chunk;
+                        assistantBubble.textContent = rawReply;
+                        var cursor = document.createElement("span");
+                        cursor.className = "typing-cursor";
+                        assistantBubble.appendChild(cursor);
+                        scrollChatToBottom();
+
+                    } else if (eventType === "done") {
+                        if (assistantBubble) {
+                            assistantBubble.innerHTML = marked.parse(rawReply);
+                        }
+                        currentSessionId = data.session_id;
+                        upsertSession(data.session);
+                        scrollChatToBottom();
+
+                    } else if (eventType === "error") {
+                        hideThinkingIndicator();
+                        addMessage("assistant", "Error: " + data.error, false);
+                    }
+                }
+            }
+
+            // Fallback: if stream ended without a done event but we have content
+            if (assistantBubble && rawReply) {
+                assistantBubble.innerHTML = marked.parse(rawReply);
+            }
+
         } catch (error) {
             hideThinkingIndicator();
             addMessage("assistant", "Unable to get a reply.\n\n" + error.message, true);

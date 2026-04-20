@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import functools
 import importlib.util
+import json
+import queue
+import re
 import threading
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 from database.chat_store import (
     DEFAULT_SESSION_TITLE,
@@ -193,6 +198,121 @@ def chat_route():
             "session_id": session_id,
             "session": updated_session,
         }
+    )
+
+
+_TOOL_LABELS: dict[str, str] = {
+    "query_db": "Querying knowledge base",
+    "fetch_noaa_alerts": "Fetching NOAA weather alerts",
+}
+
+
+def _make_tool_wrapper(fn, event_queue: queue.Queue):
+    """Wrap a Gemini tool function to emit SSE events when it runs."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        label = _TOOL_LABELS.get(fn.__name__, fn.__name__)
+        event_queue.put(("tool_call", {"name": fn.__name__, "label": label}))
+        result = fn(*args, **kwargs)
+        event_queue.put(("tool_done", {"name": fn.__name__}))
+        return result
+    return wrapper
+
+
+@app.post("/chat/stream")
+def chat_stream_route():
+    """SSE endpoint: emits tool-call events then streams the reply word-by-word."""
+    payload = request.get_json(silent=True) or {}
+    message = str(payload.get("message", "")).strip()
+    session_id = str(payload.get("session_id", "")).strip()
+
+    if not message:
+        return jsonify({"error": "Message is required."}), 400
+
+    session = get_session(session_id) if session_id else None
+    if session_id and session is None:
+        return jsonify({"error": "Session not found."}), 404
+
+    if session is None:
+        session = create_session()
+        session_id = session["id"]
+
+    previous_messages = list_messages(session_id)
+    is_first = not previous_messages
+
+    eq: queue.Queue = queue.Queue()
+    result: dict = {}
+
+    def _run():
+        try:
+            history = []
+            for m in previous_messages:
+                role = "model" if m["role"] == "assistant" else "user"
+                history.append(
+                    gemini_module.types.Content(
+                        role=role,
+                        parts=[gemini_module.types.Part(text=m["content"])],
+                    )
+                )
+            with chat_lock:
+                chat = gemini_module.client.chats.create(
+                    model="gemini-3-flash-preview",
+                    config=gemini_module.types.GenerateContentConfig(
+                        system_instruction=gemini_module.system_prompt,
+                        tools=[
+                            _make_tool_wrapper(gemini_module.query_db, eq),
+                            _make_tool_wrapper(gemini_module.fetch_noaa_alerts, eq),
+                        ],
+                    ),
+                    history=history,
+                )
+                response = chat.send_message(message)
+                result["reply"] = getattr(response, "text", "")
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = str(exc)
+        finally:
+            eq.put(("chat_done", {}))
+
+    threading.Thread(target=_run, daemon=True).start()
+
+    def _generate():
+        # Relay tool-call events until Gemini finishes.
+        while True:
+            try:
+                event_type, data = eq.get(timeout=120)
+            except queue.Empty:
+                yield f"event: error\ndata: {json.dumps({'error': 'Request timed out.'})}\n\n"
+                return
+            if event_type == "chat_done":
+                break
+            yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+
+        if "error" in result:
+            yield f"event: error\ndata: {json.dumps({'error': result['error']})}\n\n"
+            return
+
+        reply = result.get("reply", "")
+        generated_title = None
+        if is_first and session["title"] == DEFAULT_SESSION_TITLE:
+            generated_title = derive_session_title(message)
+
+        updated_session = add_message_pair(session_id, message, reply, title=generated_title)
+        if updated_session is None:
+            yield f"event: error\ndata: {json.dumps({'error': 'Session not found.'})}\n\n"
+            return
+
+        # Stream text token by token (words + whitespace preserved).
+        for token in re.findall(r"\S+|\s+", reply):
+            yield f"event: text\ndata: {json.dumps({'chunk': token})}\n\n"
+            if not token.isspace():
+                time.sleep(0.03)
+
+        yield f"event: done\ndata: {json.dumps({'session_id': session_id, 'session': updated_session})}\n\n"
+
+    return Response(
+        _generate(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

@@ -216,12 +216,11 @@ def upsert_gauge(con: sqlite3.Connection, g: dict) -> None:
                 "raw":                json.dumps(g),
             },
         )
+        _insert_crests_unsafe(con, g["lid"], flood)
 
-    upsert_crests(con, g["lid"], flood)
 
-
-def upsert_crests(con: sqlite3.Connection, lid: str, flood: dict) -> None:
-    """Bulk-insert historic and recent crests, ignoring duplicates."""
+def _insert_crests_unsafe(con: sqlite3.Connection, lid: str, flood: dict) -> None:
+    """Insert crests — must be called within an active transaction."""
     crests = flood.get("crests") or {}
     rows: list[dict] = []
 
@@ -238,16 +237,21 @@ def upsert_crests(con: sqlite3.Connection, lid: str, flood: dict) -> None:
             })
 
     if rows:
-        with con:
-            con.executemany(
-                """
-                INSERT OR IGNORE INTO gauge_crests
-                    (lid, occurred_time, stage, flow, preliminary, old_datum, crest_type)
-                VALUES
-                    (:lid, :occurred_time, :stage, :flow, :preliminary, :old_datum, :crest_type)
-                """,
-                rows,
-            )
+        con.executemany(
+            """
+            INSERT OR IGNORE INTO gauge_crests
+                (lid, occurred_time, stage, flow, preliminary, old_datum, crest_type)
+            VALUES
+                (:lid, :occurred_time, :stage, :flow, :preliminary, :old_datum, :crest_type)
+            """,
+            rows,
+        )
+
+
+def upsert_crests(con: sqlite3.Connection, lid: str, flood: dict) -> None:
+    """Bulk-insert historic and recent crests, ignoring duplicates."""
+    with con:
+        _insert_crests_unsafe(con, lid, flood)
 
 
 def refresh_reading(

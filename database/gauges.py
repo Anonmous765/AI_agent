@@ -131,13 +131,15 @@ def upsert_gauge(con: sqlite3.Connection, g: dict) -> None:
     rfc   = (g.get("rfc")   or {}).get("abbreviation")
     state = (g.get("state") or {}).get("abbreviation") or "KY"
 
-    flood  = g.get("flood") or {}
-    stages = flood.get("stages") or {}
+    flood      = g.get("flood") or {}
+    categories = flood.get("categories") or {}
+    hydrograph = ((g.get("images") or {}).get("hydrograph") or {})
+    wfo        = (g.get("wfo") or {}).get("abbreviation")
 
-    stage_action   = _normalize_stage(stages.get("action"))
-    stage_minor    = _normalize_stage(stages.get("minor"))
-    stage_moderate = _normalize_stage(stages.get("moderate"))
-    stage_major    = _normalize_stage(stages.get("major"))
+    stage_action   = _normalize_stage((categories.get("action")   or {}).get("stage"))
+    stage_minor    = _normalize_stage((categories.get("minor")    or {}).get("stage"))
+    stage_moderate = _normalize_stage((categories.get("moderate") or {}).get("stage"))
+    stage_major    = _normalize_stage((categories.get("major")    or {}).get("stage"))
     has_categories = 1 if any(
         s is not None for s in (stage_action, stage_minor, stage_moderate, stage_major)
     ) else 0
@@ -190,26 +192,26 @@ def upsert_gauge(con: sqlite3.Connection, g: dict) -> None:
             """,
             {
                 "lid":                g.get("lid"),
-                "usgs_id":            g.get("usgs_id"),
-                "reach_id":           g.get("reach_id"),
+                "usgs_id":            g.get("usgsId"),
+                "reach_id":           g.get("reachId"),
                 "name":               g.get("name"),
                 "county":             g.get("county"),
                 "state":              state,
-                "time_zone":          g.get("time_zone"),
+                "time_zone":          g.get("timeZone"),
                 "rfc":                rfc,
-                "wfo":                g.get("wfo"),
+                "wfo":                wfo,
                 "latitude":           g.get("latitude"),
                 "longitude":          g.get("longitude"),
                 "stage_action":       stage_action,
                 "stage_minor":        stage_minor,
                 "stage_moderate":     stage_moderate,
                 "stage_major":        stage_major,
-                "stage_units":        g.get("stage_units", "ft"),
+                "stage_units":        flood.get("stageUnits", "ft"),
                 "has_categories":     has_categories,
-                "upstream_lid":       g.get("upstream_lid"),
-                "downstream_lid":     g.get("downstream_lid"),
-                "url_hydrograph":     g.get("url_hydrograph"),
-                "url_hydrograph_full": g.get("url_hydrograph_full"),
+                "upstream_lid":       g.get("upstreamLid"),
+                "downstream_lid":     g.get("downstreamLid"),
+                "url_hydrograph":     hydrograph.get("default"),
+                "url_hydrograph_full": hydrograph.get("floodcat"),
                 "impacts":            impacts,
                 "raw":                json.dumps(g),
             },
@@ -227,11 +229,11 @@ def upsert_crests(con: sqlite3.Connection, lid: str, flood: dict) -> None:
         for crest in crests.get(crest_type) or []:
             rows.append({
                 "lid":           lid,
-                "occurred_time": crest.get("occurred_time"),
+                "occurred_time": crest.get("occurredTime"),
                 "stage":         crest.get("stage"),
                 "flow":          crest.get("flow"),
                 "preliminary":   crest.get("preliminary"),
-                "old_datum":     crest.get("old_datum", 0),
+                "old_datum":     int(crest.get("olddatum", False)),
                 "crest_type":    crest_type,
             })
 

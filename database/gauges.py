@@ -9,6 +9,9 @@ import requests
 from pathlib import Path
 
 
+DB_PATH = Path(__file__).resolve().parent / "ky_gauges.db"
+
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
@@ -289,6 +292,77 @@ def get_gauge(con: sqlite3.Connection, lid: str) -> dict | None:
         (lid,),
     ).fetchone()
     return dict(row) if row is not None else None
+
+
+def query_gauges(
+    county: str | None = None,
+    status_filter: str | None = None,
+    limit: int = 20,
+) -> dict:
+    """Query Kentucky flood gauges by county and/or current flood status.
+
+    Use this tool to answer questions about current river and creek water
+    levels, flood stages, and gauge conditions across Kentucky. Call it when
+    the user asks about:
+    - River or water levels in a specific county or statewide
+    - Which gauges are currently at or above flood stage
+    - How close a gauge is to flood stage (danger_ratio)
+    - Gauge status categories: normal, approaching_action, action_stage,
+      minor_flood, moderate_flood, or major_flood
+
+    Args:
+        county: Filter by county name (e.g. ``"Pike"``, ``"Jefferson"``).
+                Case-insensitive partial match. ``None`` returns all counties.
+        status_filter: Filter by flood status. One of: ``"normal"``,
+                       ``"approaching_action"``, ``"action_stage"``,
+                       ``"minor_flood"``, ``"moderate_flood"``,
+                       ``"major_flood"``, ``"no_threshold"``, ``"unknown"``.
+                       ``None`` returns all statuses.
+        limit: Maximum number of gauges to return (default 20).
+
+    Returns:
+        A dict with:
+        - ``"count"``: number of gauges returned.
+        - ``"gauges"``: list of gauge dicts, each with ``lid``, ``name``,
+          ``county``, ``last_observed_stage``, ``stage_units``,
+          ``computed_status``, ``danger_ratio``, ``last_observed_time``,
+          and ``url_hydrograph``.
+    """
+    print("[TOOL CALLED] query_gauges()")
+    con = _connect(DB_PATH)
+
+    def _run(extra_clause: str | None) -> list[sqlite3.Row]:
+        clauses: list[str] = []
+        params: list = []
+        if extra_clause:
+            clauses.append(extra_clause)
+        if county:
+            clauses.append("LOWER(county) LIKE LOWER(?)")
+            params.append(f"%{county}%")
+        if status_filter:
+            clauses.append("computed_status = ?")
+            params.append(status_filter)
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        return con.execute(
+            f"""
+            SELECT lid, name, county,
+                   last_observed_stage, stage_units, computed_status,
+                   danger_ratio, last_observed_time, url_hydrograph
+            FROM gauge_status
+            {where}
+            ORDER BY danger_ratio DESC NULLS LAST
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+
+    rows = _run("last_observed_stage IS NOT NULL")
+    if not rows:
+        rows = _run(None)
+
+    con.close()
+    return {"count": len(rows), "gauges": [dict(r) for r in rows]}
 
 
 # ---------------------------------------------------------------------------

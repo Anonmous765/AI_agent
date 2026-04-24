@@ -5,13 +5,12 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import requests
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from gauges import _connect, init_db, upsert_gauge, refresh_reading
+from ingestion.NWPS import fetch_gauge
 
 DB_PATH = Path(__file__).resolve().parent / "ky_gauges.db"
-BASE = "https://api.water.noaa.gov"
-HEADERS = {"User-Agent": "ky-disaster-graphrag/1.0 vedansh.kakkar@gmail.com"}
 WORKERS = 10
 
 KY_LIDS = [
@@ -52,15 +51,9 @@ def _get_con() -> object:
 
 def _fetch_and_upsert(lid: str) -> tuple[str, str]:
     """Fetch one gauge and write it to the DB. Returns (lid, status)."""
-    r = requests.get(
-        f"{BASE}/nwps/v1/gauges/{lid}",
-        headers=HEADERS,
-        timeout=15,
-    )
-    if r.status_code == 404:
+    data = fetch_gauge(lid)
+    if data is None:
         return lid, "skipped"
-    r.raise_for_status()
-    data = r.json()
     con = _get_con()
     upsert_gauge(con, data)
     observed = (data.get("status") or {}).get("observed") or {}

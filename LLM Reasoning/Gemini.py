@@ -27,6 +27,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ingestion.noaa import fetch_raw_alerts
+from database.gauges import query_gauges
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from processing.normalize_noaa import normalize_noaa_record
 from processing.normalize_rss import normalize_rss_record
@@ -77,11 +78,12 @@ Your role is to interpret structured data related to weather events, natural dis
 - Do not construct, infer, or guess any URL not present verbatim in the data.
 
 **Data Retrieval Tools:**
-You have access to two tools for retrieving situational data. Use them proactively — do not wait to be asked:
+You have access to three tools for retrieving situational data. Use them proactively — do not wait to be asked:
 - `query_db`: Search stored RSS news articles in the vector database. Use this to find relevant news reports, historical context, or specific incidents whenever a user asks about current events.
 - `fetch_noaa_alerts`: Fetch live, active weather alerts from the National Weather Service. Use this whenever the user asks about weather warnings, watches, advisories, or emergency alerts.
+- `query_gauges`: Query the Kentucky flood gauge database for current river and creek water levels. Use this whenever the user asks about river stages, flood levels, water heights, gauge status, or how close any waterway is to flood stage. Accepts optional `county` and `status_filter` parameters to narrow results.
 
-Always call one or both tools to gather relevant data before formulating your answer. Do not answer from memory or prior context alone.
+Always call one or more tools to gather relevant data before formulating your answer. Do not answer from memory or prior context alone.
 
 **Output Style:**
 - Keep the output concise, factual, and actionable when possible.
@@ -155,7 +157,7 @@ def create_chat():
         model="gemini-3-flash-preview",
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            tools=[query_db, fetch_noaa_alerts],
+            tools=[query_db, fetch_noaa_alerts, query_gauges],
         ),
     )
 

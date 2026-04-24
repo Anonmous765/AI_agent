@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
+import requests
 from pathlib import Path
 
 
@@ -293,5 +295,53 @@ def get_gauge(con: sqlite3.Connection, lid: str) -> dict | None:
 
 if __name__ == "__main__":
     _default_path = Path(__file__).resolve().parent / "ky_gauges.db"
+    db_connection = _connect(_default_path)
     init_db(_default_path)
     print(f"database initialised → {_default_path}")
+
+    BASE = "https://api.water.noaa.gov"
+    HEADERS = {"User-Agent": "ky-disaster-graphrag/1.0 your@email.com"}
+
+    # Pull entire gauge list — this is a large payload, give it 120s
+    r = requests.get(
+        f"{BASE}/nwps/v1/gauges",
+        params={"state": "KY"},
+        headers=HEADERS,
+        timeout=120,
+    )
+    print(r.status_code, len(r.content), "bytes")
+
+    try:
+        r.raise_for_status()
+    except requests.HTTPError:
+        print("Request failed.")
+        print("Content-Type:", r.headers.get("Content-Type"))
+        print("Body preview:", r.text[:500] or "<empty>")
+        sys.exit(1)
+
+    if not r.content.strip():
+        print("API returned an empty response body.")
+        sys.exit(1)
+
+    content_type = r.headers.get("Content-Type", "")
+    if "json" not in content_type.lower():
+        print("API did not return JSON.")
+        print("Content-Type:", content_type or "<missing>")
+        print("Body preview:", r.text[:500])
+        sys.exit(1)
+
+    try:
+        data = r.json()
+    except requests.exceptions.JSONDecodeError:
+        print("Response body was not valid JSON.")
+        print("Content-Type:", content_type or "<missing>")
+        print("Body preview:", r.text[:500] or "<empty>")
+        sys.exit(1)
+
+    all_gauges = data.get("gauges", [])
+    print(f"Total KY gauges: {len(all_gauges)}")
+
+    for g in all_gauges:
+        upsert_gauge(db_connection, g)
+
+

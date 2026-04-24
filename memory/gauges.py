@@ -1,7 +1,5 @@
 """SQLite schema and CRUD layer for Kentucky flood gauges."""
 
-from __future__ import annotations
-
 import json
 import sqlite3
 import sys
@@ -9,7 +7,7 @@ import requests
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).resolve().parent / "ky_gauges.db"
+DB_PATH = Path(__file__).resolve().parent.parent / "database" / "ky_gauges.db"
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +308,8 @@ def query_gauges(
     - Gauge status categories: normal, approaching_action, action_stage,
       minor_flood, moderate_flood, or major_flood
 
+    Always run this at least once before answering any questions.
+
     Args:
         county: Filter by county name (e.g. ``"Pike"``, ``"Jefferson"``).
                 Case-insensitive partial match. ``None`` returns all counties.
@@ -368,10 +368,9 @@ def query_gauges(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    _default_path = Path(__file__).resolve().parent / "ky_gauges.db"
-    db_connection = _connect(_default_path)
-    init_db(_default_path)
-    print(f"database initialised → {_default_path}")
+    db_connection = _connect(DB_PATH)
+    init_db(DB_PATH)
+    print(f"database initialised → {DB_PATH}")
 
     BASE = "https://api.water.noaa.gov"
     HEADERS = {"User-Agent": "ky-disaster-graphrag/1.0 your@email.com"}

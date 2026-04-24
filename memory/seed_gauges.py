@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gauges import _connect, init_db, upsert_gauge, refresh_reading
 from ingestion.NWPS import fetch_gauge
 
-DB_PATH = Path(__file__).resolve().parent / "ky_gauges.db"
+DB_PATH = Path(__file__).resolve().parent.parent / "database" / "ky_gauges.db"
 WORKERS = 10
 
 KY_LIDS = [

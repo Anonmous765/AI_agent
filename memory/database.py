@@ -87,6 +87,12 @@ def query_db(query: str, limit: int = 10):
     in the database to provide historical context, find similar past events, or
     retrieve specific information related to a user's inquiry.
 
+    When NOT to use tools:
+        - Definitional or conceptual questions (e.g. "what does X mean?",
+          "explain Y") should be answered directly from your knowledge.
+        - Only call tools when the user is asking about current conditions,
+          active events, or real-time data.
+
     Important:
         The returned matches are already ordered by priority, with the highest-
         confidence signals first. Preserve this ordering when summarizing results

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).resolve().with_name("chat_store.sqlite3")
+DB_PATH = Path(__file__).resolve().parent.parent / "database" / "chat_store.sqlite3"
 DEFAULT_SESSION_TITLE = "New Chat"
 
 

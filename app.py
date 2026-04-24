@@ -14,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
-from database.chat_store import (
+from memory.chat_store import (
     DEFAULT_SESSION_TITLE,
     add_message_pair,
     create_session,

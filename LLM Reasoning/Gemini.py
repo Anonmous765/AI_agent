@@ -27,7 +27,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ingestion.noaa import fetch_raw_alerts
-from database.gauges import query_gauges
+from memory.gauges import query_gauges
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from processing.normalize_noaa import normalize_noaa_record
 from processing.normalize_rss import normalize_rss_record

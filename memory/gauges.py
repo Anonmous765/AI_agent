@@ -3,16 +3,22 @@
 import json
 import sqlite3
 import sys
-import requests
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import requests
+
+from ingestion.NWPS import fetch_gauge
 
 DB_PATH = Path(__file__).resolve().parent.parent / "database" / "ky_gauges.db"
+STALE_READING_THRESHOLD = timedelta(minutes=15)
+REFRESH_WORKERS = 10
 
 
-# ---------------------------------------------------------------------------
 # Private helpers
-# ---------------------------------------------------------------------------
+
 
 def _normalize_stage(val) -> float | None:
     """Return None for NWPS sentinel -9999 or Python None; otherwise float."""
@@ -28,9 +34,7 @@ def _connect(db_path: str | Path) -> sqlite3.Connection:
     return con
 
 
-# ---------------------------------------------------------------------------
 # DDL
-# ---------------------------------------------------------------------------
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS gauges (
@@ -116,9 +120,8 @@ CREATE INDEX IF NOT EXISTS idx_crests_stage  ON gauge_crests(lid, stage DESC);
 """
 
 
-# ---------------------------------------------------------------------------
 # Public API
-# ---------------------------------------------------------------------------
+
 
 def init_db(db_path: str | Path) -> None:
     """Create all tables, view, and indexes. Safe to call on an existing database."""
@@ -131,18 +134,18 @@ def init_db(db_path: str | Path) -> None:
 
 def upsert_gauge(con: sqlite3.Connection, g: dict) -> None:
     """Insert or update one gauge record, preserving live reading columns."""
-    rfc   = (g.get("rfc")   or {}).get("abbreviation")
+    rfc = (g.get("rfc") or {}).get("abbreviation")
     state = (g.get("state") or {}).get("abbreviation") or "KY"
 
-    flood      = g.get("flood") or {}
+    flood = g.get("flood") or {}
     categories = flood.get("categories") or {}
     hydrograph = ((g.get("images") or {}).get("hydrograph") or {})
-    wfo        = (g.get("wfo") or {}).get("abbreviation")
+    wfo = (g.get("wfo") or {}).get("abbreviation")
 
-    stage_action   = _normalize_stage((categories.get("action")   or {}).get("stage"))
-    stage_minor    = _normalize_stage((categories.get("minor")    or {}).get("stage"))
+    stage_action = _normalize_stage((categories.get("action") or {}).get("stage"))
+    stage_minor = _normalize_stage((categories.get("minor") or {}).get("stage"))
     stage_moderate = _normalize_stage((categories.get("moderate") or {}).get("stage"))
-    stage_major    = _normalize_stage((categories.get("major")    or {}).get("stage"))
+    stage_major = _normalize_stage((categories.get("major") or {}).get("stage"))
     has_categories = 1 if any(
         s is not None for s in (stage_action, stage_minor, stage_moderate, stage_major)
     ) else 0
@@ -194,50 +197,52 @@ def upsert_gauge(con: sqlite3.Connection, g: dict) -> None:
                 raw                 = excluded.raw
             """,
             {
-                "lid":                g.get("lid"),
-                "usgs_id":            g.get("usgsId"),
-                "reach_id":           g.get("reachId"),
-                "name":               g.get("name"),
-                "county":             g.get("county"),
-                "state":              state,
-                "time_zone":          g.get("timeZone"),
-                "rfc":                rfc,
-                "wfo":                wfo,
-                "latitude":           g.get("latitude"),
-                "longitude":          g.get("longitude"),
-                "stage_action":       stage_action,
-                "stage_minor":        stage_minor,
-                "stage_moderate":     stage_moderate,
-                "stage_major":        stage_major,
-                "stage_units":        flood.get("stageUnits", "ft"),
-                "has_categories":     has_categories,
-                "upstream_lid":       g.get("upstreamLid"),
-                "downstream_lid":     g.get("downstreamLid"),
-                "url_hydrograph":     hydrograph.get("default"),
+                "lid": g.get("lid"),
+                "usgs_id": g.get("usgsId"),
+                "reach_id": g.get("reachId"),
+                "name": g.get("name"),
+                "county": g.get("county"),
+                "state": state,
+                "time_zone": g.get("timeZone"),
+                "rfc": rfc,
+                "wfo": wfo,
+                "latitude": g.get("latitude"),
+                "longitude": g.get("longitude"),
+                "stage_action": stage_action,
+                "stage_minor": stage_minor,
+                "stage_moderate": stage_moderate,
+                "stage_major": stage_major,
+                "stage_units": flood.get("stageUnits", "ft"),
+                "has_categories": has_categories,
+                "upstream_lid": g.get("upstreamLid"),
+                "downstream_lid": g.get("downstreamLid"),
+                "url_hydrograph": hydrograph.get("default"),
                 "url_hydrograph_full": hydrograph.get("floodcat"),
-                "impacts":            impacts,
-                "raw":                json.dumps(g),
+                "impacts": impacts,
+                "raw": json.dumps(g),
             },
         )
         _insert_crests_unsafe(con, g["lid"], flood)
 
 
 def _insert_crests_unsafe(con: sqlite3.Connection, lid: str, flood: dict) -> None:
-    """Insert crests — must be called within an active transaction."""
+    """Insert crests. Must be called within an active transaction."""
     crests = flood.get("crests") or {}
     rows: list[dict] = []
 
     for crest_type in ("historic", "recent"):
         for crest in crests.get(crest_type) or []:
-            rows.append({
-                "lid":           lid,
-                "occurred_time": crest.get("occurredTime"),
-                "stage":         crest.get("stage"),
-                "flow":          crest.get("flow"),
-                "preliminary":   crest.get("preliminary"),
-                "old_datum":     int(crest.get("olddatum", False)),
-                "crest_type":    crest_type,
-            })
+            rows.append(
+                {
+                    "lid": lid,
+                    "occurred_time": crest.get("occurredTime"),
+                    "stage": crest.get("stage"),
+                    "flow": crest.get("flow"),
+                    "preliminary": crest.get("preliminary"),
+                    "old_datum": int(crest.get("olddatum", False)),
+                    "crest_type": crest_type,
+                }
+            )
 
     if rows:
         con.executemany(
@@ -275,12 +280,79 @@ def refresh_reading(
             WHERE lid = :lid
             """,
             {
-                "stage":          stage,
-                "valid_time":     valid_time,
+                "stage": stage,
+                "valid_time": valid_time,
                 "flood_category": flood_category,
-                "lid":            lid,
+                "lid": lid,
             },
         )
+
+
+def _is_stale(
+    last_observed_time: str | None,
+    stale_threshold: timedelta = STALE_READING_THRESHOLD,
+) -> bool:
+    """Return True if the timestamp is missing or older than the threshold."""
+    if not last_observed_time:
+        return True
+
+    try:
+        last = datetime.fromisoformat(last_observed_time.replace("Z", "+00:00"))
+        return datetime.now(timezone.utc) - last > stale_threshold
+    except Exception:
+        return True
+
+
+def _refresh_lids(con: sqlite3.Connection, lids: list[str]) -> int:
+    """Fetch live readings for stale gauges in parallel. Returns count refreshed."""
+    success_count = 0
+    lock = threading.Lock()
+
+    def _fetch_one(lid: str) -> None:
+        nonlocal success_count
+
+        try:
+            data = fetch_gauge(lid)
+            if data is None:
+                return
+
+            observed = (data.get("status") or {}).get("observed") or {}
+            stage = observed.get("primary")
+            if stage is not None and stage != -999:
+                refresh_reading(
+                    con,
+                    lid,
+                    float(stage),
+                    observed.get("validTime"),
+                    observed.get("floodCategory"),
+                )
+                with lock:
+                    success_count += 1
+        except Exception as exc:
+            print(f"  warning: failed to refresh {lid}: {exc}")
+
+    with ThreadPoolExecutor(max_workers=REFRESH_WORKERS) as pool:
+        pool.map(_fetch_one, lids)
+
+    print(f"  refreshed {success_count}/{len(lids)} gauge(s) successfully")
+    return success_count
+
+
+def _refresh_if_stale(con: sqlite3.Connection) -> int:
+    """Refresh all gauge readings when the cache is stale."""
+    probe = con.execute(
+        "SELECT last_observed_time FROM gauges WHERE last_observed_time IS NOT NULL LIMIT 1"
+    ).fetchone()
+    data_is_stale = _is_stale(probe["last_observed_time"] if probe else None)
+
+    if not data_is_stale:
+        return 0
+
+    all_lids = [
+        row["lid"] for row in con.execute("SELECT lid FROM gauges").fetchall()
+    ]
+    print(f"  data is stale, refreshing all {len(all_lids)} gauge(s)...")
+    return _refresh_lids(con, all_lids)
 
 
 def get_gauge(con: sqlite3.Connection, lid: str) -> dict | None:
@@ -308,7 +380,8 @@ def query_gauges(
     - Gauge status categories: normal, approaching_action, action_stage,
       minor_flood, moderate_flood, or major_flood
 
-    Always run this at least once before answering any questions.
+    Always run this at least once before answering any questions about
+    water levels. Data is automatically refreshed if older than 15 minutes.
 
     Args:
         county: Filter by county name (e.g. ``"Pike"``, ``"Jefferson"``).
@@ -323,6 +396,7 @@ def query_gauges(
     Returns:
         A dict with:
         - ``"count"``: number of gauges returned.
+        - ``"refreshed"``: number of gauges whose readings were updated.
         - ``"gauges"``: list of gauge dicts, each with ``lid``, ``name``,
           ``county``, ``last_observed_stage``, ``stage_units``,
           ``computed_status``, ``danger_ratio``, ``last_observed_time``,
@@ -330,10 +404,12 @@ def query_gauges(
     """
     print("[TOOL CALLED] query_gauges()")
     con = _connect(DB_PATH)
+    refreshed = _refresh_if_stale(con)
 
     def _run(extra_clause: str | None) -> list[sqlite3.Row]:
         clauses: list[str] = []
-        params: list = []
+        params: list[object] = []
+
         if extra_clause:
             clauses.append(extra_clause)
         if county:
@@ -342,13 +418,22 @@ def query_gauges(
         if status_filter:
             clauses.append("computed_status = ?")
             params.append(status_filter)
+
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         params.append(limit)
+
         return con.execute(
             f"""
-            SELECT lid, name, county,
-                   last_observed_stage, stage_units, computed_status,
-                   danger_ratio, last_observed_time, url_hydrograph
+            SELECT
+                lid,
+                name,
+                county,
+                last_observed_stage,
+                stage_units,
+                computed_status,
+                danger_ratio,
+                last_observed_time,
+                url_hydrograph
             FROM gauge_status
             {where}
             ORDER BY danger_ratio DESC NULLS LAST
@@ -362,20 +447,22 @@ def query_gauges(
         rows = _run(None)
 
     con.close()
-    return {"count": len(rows), "gauges": [dict(r) for r in rows]}
+    return {
+        "count": len(rows),
+        "refreshed": refreshed,
+        "gauges": [dict(r) for r in rows],
+    }
 
-
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     db_connection = _connect(DB_PATH)
     init_db(DB_PATH)
-    print(f"database initialised → {DB_PATH}")
+    print(f"database initialised -> {DB_PATH}")
 
     BASE = "https://api.water.noaa.gov"
     HEADERS = {"User-Agent": "ky-disaster-graphrag/1.0 your@email.com"}
 
-    # Pull entire gauge list — this is a large payload, give it 120s
+    # Pull entire gauge list. This is a large payload, so give it 120s.
     r = requests.get(
         f"{BASE}/nwps/v1/gauges",
         params={"state": "KY"},
@@ -416,5 +503,3 @@ if __name__ == "__main__":
 
     for g in all_gauges:
         upsert_gauge(db_connection, g)
-
-

@@ -28,8 +28,6 @@ OSM_NAMES: set[str] = (
 
 nlp = spacy.load("en_core_web_trf")
 
-ruler = nlp.add_pipe("entity_ruler", before="ner")
-
 
 def geo_info(rss_signal: RssNormalizedSignal) -> list[EntityInfo]:
     text = rss_signal.raw_text

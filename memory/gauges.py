@@ -3,7 +3,6 @@
 import json
 import sqlite3
 import sys
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -303,36 +302,46 @@ def _is_stale(
         return True
 
 
+def _fetch_live_reading(lid: str) -> tuple[str, float, str | None, str | None] | None:
+    """Fetch one live gauge reading without touching SQLite."""
+    try:
+        data = fetch_gauge(lid)
+        if data is None:
+            return None
+
+        observed = (data.get("status") or {}).get("observed") or {}
+        stage = observed.get("primary")
+        if stage is None or stage == -999:
+            return None
+
+        return (
+            lid,
+            float(stage),
+            observed.get("validTime"),
+            observed.get("floodCategory"),
+        )
+    except Exception as exc:
+        print(f"  warning: failed to fetch {lid}: {exc}")
+        return None
+
+
 def _refresh_lids(con: sqlite3.Connection, lids: list[str]) -> int:
-    """Fetch live readings for stale gauges in parallel. Returns count refreshed."""
+    """Fetch live readings in parallel, then write updates on this thread."""
     success_count = 0
-    lock = threading.Lock()
-
-    def _fetch_one(lid: str) -> None:
-        nonlocal success_count
-
-        try:
-            data = fetch_gauge(lid)
-            if data is None:
-                return
-
-            observed = (data.get("status") or {}).get("observed") or {}
-            stage = observed.get("primary")
-            if stage is not None and stage != -999:
-                refresh_reading(
-                    con,
-                    lid,
-                    float(stage),
-                    observed.get("validTime"),
-                    observed.get("floodCategory"),
-                )
-                with lock:
-                    success_count += 1
-        except Exception as exc:
-            print(f"  warning: failed to refresh {lid}: {exc}")
 
     with ThreadPoolExecutor(max_workers=REFRESH_WORKERS) as pool:
-        pool.map(_fetch_one, lids)
+        readings = pool.map(_fetch_live_reading, lids)
+
+    for reading in readings:
+        if reading is None:
+            continue
+
+        lid, stage, valid_time, flood_category = reading
+        try:
+            refresh_reading(con, lid, stage, valid_time, flood_category)
+            success_count += 1
+        except Exception as exc:
+            print(f"  warning: failed to write refresh for {lid}: {exc}")
 
     print(f"  refreshed {success_count}/{len(lids)} gauge(s) successfully")
     return success_count

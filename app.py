@@ -86,7 +86,7 @@ def create_chat_with_history(messages: list[dict]):
         model="gemini-3-flash-preview",
         config=gemini_module.types.GenerateContentConfig(
             system_instruction=gemini_module.system_prompt,
-            tools=[gemini_module.query_db, gemini_module.fetch_noaa_alerts, gemini_module.query_gauges],
+            tools=[gemini_module.query_db, gemini_module.fetch_noaa_alerts, gemini_module.query_gauges, gemini_module.query_crests],
         ),
         history=history,
     )
@@ -205,6 +205,7 @@ _TOOL_LABELS: dict[str, str] = {
     "query_db": "Querying knowledge base",
     "fetch_noaa_alerts": "Fetching NOAA weather alerts",
     "query_gauges": "Querying flood gauge data",
+    "query_crests": "Querying historical crest records",
 }
 
 
@@ -264,6 +265,7 @@ def chat_stream_route():
                             _make_tool_wrapper(gemini_module.query_db, eq),
                             _make_tool_wrapper(gemini_module.fetch_noaa_alerts, eq),
                             _make_tool_wrapper(gemini_module.query_gauges, eq),
+                            _make_tool_wrapper(gemini_module.query_crests, eq),
                         ],
                     ),
                     history=history,

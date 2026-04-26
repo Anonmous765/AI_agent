@@ -65,3 +65,5 @@ def fetch_gauge(
 
     return response.json()
 
+if __name__ == "__main__":
+    print(fetch_gauge("ABPK2"))

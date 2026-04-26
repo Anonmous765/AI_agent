@@ -11,6 +11,7 @@ testing.ipynb
 
 # IDE
 .idea/
+.codex
 
 # Git
 .git/

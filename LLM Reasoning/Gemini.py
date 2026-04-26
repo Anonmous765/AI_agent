@@ -27,7 +27,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ingestion.noaa import fetch_raw_alerts
-from memory.gauges import query_gauges
+from memory.gauges import query_gauges, query_crests
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from processing.normalize_noaa import normalize_noaa_record
 from processing.normalize_rss import normalize_rss_record
@@ -157,7 +157,7 @@ def create_chat():
         model="gemini-3-flash-preview",
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            tools=[query_db, fetch_noaa_alerts, query_gauges],
+            tools=[query_db, fetch_noaa_alerts, query_gauges, query_crests],
         ),
     )
 

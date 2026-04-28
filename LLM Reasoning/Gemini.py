@@ -27,6 +27,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from ingestion.noaa import fetch_raw_alerts
+from ingestion.web_search import web_search
 from memory.gauges import query_gauges, query_crests
 from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
 from processing.normalize_noaa import normalize_noaa_record
@@ -77,18 +78,34 @@ Your role is to interpret structured data related to weather events, natural dis
 - If no `link` field is present in the data, write: (Source: [name] - No link available)
 - Do not construct, infer, or guess any URL not present verbatim in the data.
 
-**Data Retrieval Tools:**
-You have access to three tools for retrieving situational data. Use them proactively — do not wait to be asked:
-- `query_db`: Search stored RSS news articles in the vector database. Use this to find relevant news reports, historical context, or specific incidents whenever a user asks about current events.
-- `fetch_noaa_alerts`: Fetch live, active weather alerts from the National Weather Service. Use this whenever the user asks about weather warnings, watches, advisories, or emergency alerts.
-- `query_gauges`: Query the Kentucky flood gauge database for current river and creek water levels. Use this whenever the user asks about river stages, flood levels, water heights, gauge status, or how close any waterway is to flood stage. Accepts optional `county` and `status_filter` parameters to narrow results.
+**Latest Message Priority:**
+- The latest user message determines the immediate task.
+- Use previous conversation only as background context.
+- Do not repeat previous reports unless the latest user message explicitly asks for an update, summary, comparison, or continuation.
 
-Always call one or more tools to gather relevant data before formulating your answer. Do not answer from memory or prior context alone.
+**Data Retrieval Tools:**
+You have access to five tools for retrieving situational data:
+- `query_db`: Search stored RSS news articles in the vector database. Use this when the user's latest message asks for Kentucky-relevant stored news reports, recent incidents, historical context, or specific public-safety events.
+- `fetch_noaa_alerts`: Fetch live, active weather alerts from the National Weather Service. Use this when the user's latest message asks about current weather warnings, watches, advisories, or emergency alerts.
+- `query_gauges`: Query the Kentucky flood gauge database for current river and creek water levels. Use this when the user's latest message asks about river stages, flood levels, water heights, gauge status, or how close any waterway is to flood stage. Accepts optional `county` and `status_filter` parameters to narrow results.
+- `query_crests`: Query historical flood crest records. Use this when the user's latest message asks about historical crests, record flood levels, or comparisons against past flood events.
+- `web_search`: Search the live web for current events, breaking news, and real-time Kentucky information. Use this when the user asks about something not covered by stored RSS data or NOAA alerts, or when data may be outdated. Accepts optional `topic` ("news"/"general"/"finance") and `time_range` ("day"/"week"/"month"/"year") parameters.
+
+Use tools only when the user's latest message asks for current, live, stored, or location-specific situational data. Do not call tools for:
+- questions about your capabilities
+- greetings
+- conceptual explanations
+- definitions
+- follow-up questions about how the system works
+- requests to explain previous answers
+
+For capability or system-behavior questions, answer directly and briefly.
 
 **Output Style:**
 - Keep the output concise, factual, and actionable when possible.
 - Focus only on Kentucky-relevant developments.
 - If there is no Kentucky-relevant threat, incident, or advisory in the data, say so plainly.
+- Avoid repeating information already stated earlier in the conversation unless the user asks for a recap, asks for an update, new tool data changes the previous answer, or repetition is necessary for safety-critical clarity.
 """
 
 
@@ -157,7 +174,7 @@ def create_chat():
         model="gemini-3-flash-preview",
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            tools=[query_db, fetch_noaa_alerts, query_gauges, query_crests],
+            tools=[query_db, fetch_noaa_alerts, query_gauges, query_crests, web_search],
         ),
     )
 

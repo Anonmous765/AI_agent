@@ -59,6 +59,8 @@ chat_lock = threading.Lock()
 
 app = Flask(__name__)
 
+MODEL_NAME = "gemini-3-flash-preview"
+MAX_HISTORY_MESSAGES = 6
 
 def derive_session_title(message: str, max_length: int = 60) -> str:
     """Generate a compact session title from the first user message."""
@@ -70,10 +72,11 @@ def derive_session_title(message: str, max_length: int = 60) -> str:
     return f"{collapsed[: max_length - 1].rstrip()}..."
 
 
-def create_chat_with_history(messages: list[dict]):
-    """Create a fresh Gemini chat seeded with previously stored turns."""
+
+def _gemini_history(messages: list[dict]) -> list:
+    """Convert recent persisted messages into Gemini chat history."""
     history = []
-    for message in messages:
+    for message in messages[-MAX_HISTORY_MESSAGES:]:
         role = "model" if message["role"] == "assistant" else "user"
         history.append(
             gemini_module.types.Content(
@@ -81,15 +84,76 @@ def create_chat_with_history(messages: list[dict]):
                 parts=[gemini_module.types.Part(text=message["content"])],
             )
         )
+    return history
+
+
+def _default_tools() -> list:
+    """Return the production data-retrieval tools."""
+    return [
+        gemini_module.query_db,
+        gemini_module.fetch_noaa_alerts,
+        gemini_module.query_gauges,
+        gemini_module.query_crests,
+        gemini_module.web_search,
+    ]
+
+
+def create_chat_with_history(
+    messages: list[dict],
+    *,
+    system_instruction: str | None = None,
+    tools: list | None = None,
+):
+    """Create a fresh Gemini chat seeded with previously stored turns."""
+    config_kwargs = {
+        "system_instruction": system_instruction or gemini_module.system_prompt,
+    }
+    if tools is None:
+        tools = _default_tools()
+    if tools:
+        config_kwargs["tools"] = tools
 
     return gemini_module.client.chats.create(
-        model="gemini-3-flash-preview",
-        config=gemini_module.types.GenerateContentConfig(
-            system_instruction=gemini_module.system_prompt,
-            tools=[gemini_module.query_db, gemini_module.fetch_noaa_alerts, gemini_module.query_gauges, gemini_module.query_crests],
-        ),
-        history=history,
+        model=MODEL_NAME,
+        config=gemini_module.types.GenerateContentConfig(**config_kwargs),
+        history=_gemini_history(messages),
     )
+
+
+def _save_exchange(
+    session: dict,
+    session_id: str,
+    previous_messages: list[dict],
+    message: str,
+    reply: str,
+) -> dict | None:
+    """Persist a user/assistant exchange and update the title on first message."""
+    generated_title = None
+    if not previous_messages and session["title"] == DEFAULT_SESSION_TITLE:
+        generated_title = derive_session_title(message)
+
+    return add_message_pair(
+        session_id,
+        message,
+        reply,
+        title=generated_title,
+    )
+
+
+def _chat_response(reply: str, session_id: str, session: dict, previous_messages: list[dict], message: str):
+    """Persist and return a non-streaming chat response."""
+    updated_session = _save_exchange(session, session_id, previous_messages, message, reply)
+    if updated_session is None:
+        return jsonify({"error": "Session not found."}), 404
+
+    return jsonify(
+        {
+            "reply": reply,
+            "session_id": session_id,
+            "session": updated_session,
+        }
+    )
+
 
 
 @app.get("/")
@@ -170,7 +234,6 @@ def chat_route():
         session_id = session["id"]
 
     previous_messages = list_messages(session_id)
-
     try:
         with chat_lock:
             chat = create_chat_with_history(previous_messages)
@@ -178,27 +241,8 @@ def chat_route():
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": str(exc)}), 500
 
-    reply = getattr(response, "text", "")
-    generated_title = None
-    if not previous_messages and session["title"] == DEFAULT_SESSION_TITLE:
-        generated_title = derive_session_title(message)
-
-    updated_session = add_message_pair(
-        session_id,
-        message,
-        reply,
-        title=generated_title,
-    )
-    if updated_session is None:
-        return jsonify({"error": "Session not found."}), 404
-
-    return jsonify(
-        {
-            "reply": reply,
-            "session_id": session_id,
-            "session": updated_session,
-        }
-    )
+    reply = getattr(response, "text", "") or ""
+    return _chat_response(reply, session_id, session, previous_messages, message)
 
 
 _TOOL_LABELS: dict[str, str] = {
@@ -206,6 +250,7 @@ _TOOL_LABELS: dict[str, str] = {
     "fetch_noaa_alerts": "Fetching NOAA weather alerts",
     "query_gauges": "Querying flood gauge data",
     "query_crests": "Querying historical crest records",
+    "web_search": "Searching the web",
 }
 
 
@@ -240,38 +285,26 @@ def chat_stream_route():
         session_id = session["id"]
 
     previous_messages = list_messages(session_id)
-    is_first = not previous_messages
 
     eq: queue.Queue = queue.Queue()
     result: dict = {}
 
     def _run():
         try:
-            history = []
-            for m in previous_messages:
-                role = "model" if m["role"] == "assistant" else "user"
-                history.append(
-                    gemini_module.types.Content(
-                        role=role,
-                        parts=[gemini_module.types.Part(text=m["content"])],
-                    )
-                )
+            tools = [
+                _make_tool_wrapper(gemini_module.query_db, eq),
+                _make_tool_wrapper(gemini_module.fetch_noaa_alerts, eq),
+                _make_tool_wrapper(gemini_module.query_gauges, eq),
+                _make_tool_wrapper(gemini_module.query_crests, eq),
+                _make_tool_wrapper(gemini_module.web_search, eq),
+            ]
             with chat_lock:
-                chat = gemini_module.client.chats.create(
-                    model="gemini-3-flash-preview",
-                    config=gemini_module.types.GenerateContentConfig(
-                        system_instruction=gemini_module.system_prompt,
-                        tools=[
-                            _make_tool_wrapper(gemini_module.query_db, eq),
-                            _make_tool_wrapper(gemini_module.fetch_noaa_alerts, eq),
-                            _make_tool_wrapper(gemini_module.query_gauges, eq),
-                            _make_tool_wrapper(gemini_module.query_crests, eq),
-                        ],
-                    ),
-                    history=history,
+                chat = create_chat_with_history(
+                    previous_messages,
+                    tools=tools,
                 )
                 response = chat.send_message(message)
-                result["reply"] = getattr(response, "text", "")
+                result["reply"] = getattr(response, "text", "") or ""
         except Exception as exc:  # noqa: BLE001
             result["error"] = str(exc)
         finally:
@@ -296,11 +329,7 @@ def chat_stream_route():
             return
 
         reply = result.get("reply", "")
-        generated_title = None
-        if is_first and session["title"] == DEFAULT_SESSION_TITLE:
-            generated_title = derive_session_title(message)
-
-        updated_session = add_message_pair(session_id, message, reply, title=generated_title)
+        updated_session = _save_exchange(session, session_id, previous_messages, message, reply)
         if updated_session is None:
             yield f"event: error\ndata: {json.dumps({'error': 'Session not found.'})}\n\n"
             return

@@ -125,7 +125,7 @@ def list_messages(session_id: str) -> list[dict]:
             SELECT id, session_id, role, content, created_at
             FROM messages
             WHERE session_id = ?
-            ORDER BY created_at ASC, id ASC
+            ORDER BY created_at ASC, rowid ASC
             """,
             (session_id,),
         ).fetchall()

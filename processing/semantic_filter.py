@@ -22,24 +22,11 @@ PROMPTS = {
     "missing_person": "missing person amber alert endangered missing child abduction search rescue",
 }
 
-KY_LOCATIONS = [
-    "Kentucky Louisville Lexington Bowling Green Owensboro Covington",
-    "Jefferson County Fayette County Warren County Ohio County",
-    "Ohio River Kentucky River Cumberland River Lake Cumberland",
-    "KY Tennessee Indiana Ohio border region midwest"
-]
-
 labels = list(PROMPTS.keys())
 prompt_texts = list(PROMPTS.values())
 
 prompt_embs = model.encode(
     prompt_texts,
-    convert_to_tensor=True,
-    normalize_embeddings=True
-)
-
-location_embs = model.encode(
-    KY_LOCATIONS,
     convert_to_tensor=True,
     normalize_embeddings=True
 )
@@ -60,22 +47,15 @@ def classify_article(signal: RssNormalizedSignal, threshold: float = 0.40) -> di
         normalize_embeddings=True
     )
 
-    # Compute cosine similarity between article and prompt embeddings
     topic_scores = util.cos_sim(article_emb, prompt_embs)[0]
     best_idx = torch.argmax(topic_scores).item()
     best_label = labels[best_idx]
     best_score = topic_scores[best_idx].item()
 
-    # Compute cosine similarity between article and location embeddings
-
-    location_scores = util.cos_sim(article_emb, location_embs)[0]
-    location_score = torch.max(location_scores).item()
-
     return {
         "relevant": (best_score >= threshold),
         "label": best_label,
         "score": best_score,
-        "location_score": location_score,
         "topic_scores": {labels[i]: topic_scores[i].item() for i in range(len(labels))},
         "article_emb": article_emb.tolist()
     }

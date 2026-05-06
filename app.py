@@ -2,21 +2,17 @@
 
 from __future__ import annotations
 
-import functools
-import importlib.util
 import json
 import queue
 import re
 import threading
 import time
-from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
 from memory.chat_store import (
     DEFAULT_SESSION_TITLE,
-    add_message_pair,
     create_session,
     delete_session,
     get_session,
@@ -26,29 +22,17 @@ from memory.chat_store import (
     rename_session,
 )
 
-
 load_dotenv()
 
+from llm_reasoning.gemini_chat import (
+    _chat_response,
+    _make_tool_wrapper,
+    _save_exchange,
+    create_chat_with_history,
+    gemini_module,
+)
 
-# Build absolute paths from the project root so the app works reliably when started locally.
-PROJECT_ROOT = Path(__file__).resolve().parent
-GEMINI_PATH = PROJECT_ROOT / "LLM Reasoning" / "Gemini.py"
-
-
-def load_gemini_module():
-    """Load the existing Gemini.py file as a module."""
-    spec = importlib.util.spec_from_file_location("disasterai_gemini", GEMINI_PATH)
-
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load Gemini.py from {GEMINI_PATH}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-# Import the Gemini module once at startup, then run its startup population flow.
-gemini_module = load_gemini_module()
+# Run the startup pipeline (RSS population + Gemini session warm-up).
 gemini_module.initialize_chat()
 
 # Persist chat sessions before the first request arrives.
@@ -58,102 +42,6 @@ init_db()
 chat_lock = threading.Lock()
 
 app = Flask(__name__)
-
-MODEL_NAME = "gemini-3-flash-preview"
-MAX_HISTORY_MESSAGES = 6
-
-def derive_session_title(message: str, max_length: int = 60) -> str:
-    """Generate a compact session title from the first user message."""
-    collapsed = " ".join(message.split())
-    if not collapsed:
-        return DEFAULT_SESSION_TITLE
-    if len(collapsed) <= max_length:
-        return collapsed
-    return f"{collapsed[: max_length - 1].rstrip()}..."
-
-
-
-def _gemini_history(messages: list[dict]) -> list:
-    """Convert recent persisted messages into Gemini chat history."""
-    history = []
-    for message in messages[-MAX_HISTORY_MESSAGES:]:
-        role = "model" if message["role"] == "assistant" else "user"
-        history.append(
-            gemini_module.types.Content(
-                role=role,
-                parts=[gemini_module.types.Part(text=message["content"])],
-            )
-        )
-    return history
-
-
-def _default_tools() -> list:
-    """Return the production data-retrieval tools."""
-    return [
-        gemini_module.query_db,
-        gemini_module.fetch_noaa_alerts,
-        gemini_module.query_gauges,
-        gemini_module.query_crests,
-        gemini_module.web_search,
-    ]
-
-
-def create_chat_with_history(
-    messages: list[dict],
-    *,
-    system_instruction: str | None = None,
-    tools: list | None = None,
-):
-    """Create a fresh Gemini chat seeded with previously stored turns."""
-    config_kwargs = {
-        "system_instruction": system_instruction or gemini_module.system_prompt,
-    }
-    if tools is None:
-        tools = _default_tools()
-    if tools:
-        config_kwargs["tools"] = tools
-
-    return gemini_module.client.chats.create(
-        model=MODEL_NAME,
-        config=gemini_module.types.GenerateContentConfig(**config_kwargs),
-        history=_gemini_history(messages),
-    )
-
-
-def _save_exchange(
-    session: dict,
-    session_id: str,
-    previous_messages: list[dict],
-    message: str,
-    reply: str,
-) -> dict | None:
-    """Persist a user/assistant exchange and update the title on first message."""
-    generated_title = None
-    if not previous_messages and session["title"] == DEFAULT_SESSION_TITLE:
-        generated_title = derive_session_title(message)
-
-    return add_message_pair(
-        session_id,
-        message,
-        reply,
-        title=generated_title,
-    )
-
-
-def _chat_response(reply: str, session_id: str, session: dict, previous_messages: list[dict], message: str):
-    """Persist and return a non-streaming chat response."""
-    updated_session = _save_exchange(session, session_id, previous_messages, message, reply)
-    if updated_session is None:
-        return jsonify({"error": "Session not found."}), 404
-
-    return jsonify(
-        {
-            "reply": reply,
-            "session_id": session_id,
-            "session": updated_session,
-        }
-    )
-
 
 
 @app.get("/")
@@ -242,28 +130,10 @@ def chat_route():
         return jsonify({"error": str(exc)}), 500
 
     reply = getattr(response, "text", "") or ""
-    return _chat_response(reply, session_id, session, previous_messages, message)
-
-
-_TOOL_LABELS: dict[str, str] = {
-    "query_db": "Querying knowledge base",
-    "fetch_noaa_alerts": "Fetching NOAA weather alerts",
-    "query_gauges": "Querying flood gauge data",
-    "query_crests": "Querying historical crest records",
-    "web_search": "Searching the web",
-}
-
-
-def _make_tool_wrapper(fn, event_queue: queue.Queue):
-    """Wrap a Gemini tool function to emit SSE events when it runs."""
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        label = _TOOL_LABELS.get(fn.__name__, fn.__name__)
-        event_queue.put(("tool_call", {"name": fn.__name__, "label": label}))
-        result = fn(*args, **kwargs)
-        event_queue.put(("tool_done", {"name": fn.__name__}))
-        return result
-    return wrapper
+    result = _chat_response(reply, session_id, session, previous_messages, message)
+    if result is None:
+        return jsonify({"error": "Session not found."}), 404
+    return jsonify(result)
 
 
 @app.post("/chat/stream")

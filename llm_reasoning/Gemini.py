@@ -7,7 +7,7 @@ This script:
 - Provides a CLI loop for user queries.
 
 Usage:
-    python "LLM Reasoning/Gemini.py"
+    python llm_reasoning/Gemini.py
 
 Notes:
     Type "exit" to quit the interactive session.

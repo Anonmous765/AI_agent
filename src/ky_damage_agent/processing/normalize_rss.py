@@ -3,8 +3,8 @@
 from datetime import datetime
 from typing import Optional
 
-from schemas.schema import RssNormalizedSignal
-from processing.scoring import (
+from ky_damage_agent.schemas.schema import RssNormalizedSignal
+from ky_damage_agent.processing.scoring import (
     DEFAULT_RSS_CONFIDENCE,
     SOURCE_BLEND,
     SOURCE_CONFIDENCE,

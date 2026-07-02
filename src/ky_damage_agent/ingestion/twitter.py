@@ -13,7 +13,6 @@ All transformation and filtering is handled by normalization/normalize.py.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
 
 import dotenv
@@ -22,7 +21,9 @@ try:
 except ImportError:  # pragma: no cover - handled at runtime for local testability
     tweepy = None
 
-dotenv.load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
+from ky_damage_agent.paths import ENV_FILE
+
+dotenv.load_dotenv(dotenv_path=ENV_FILE)
 
 MAX_TWEETS = 5
 

@@ -1,4 +1,4 @@
-is # KY Damage Agent
+# KY Damage Agent
 
 **Kentucky Disaster Situational Awareness AI**
 
@@ -39,7 +39,7 @@ KY Damage Agent is a real-time situational awareness system built for disaster r
 
 4. Gemini LLM Agent
    ├─ System prompt: Kentucky-only scope, professional tone, strict citations
-   ├─ 5 tools: query_vector_db(), fetch_noaa_alerts(), query_gauges(), 
+   ├─ 5 tools: query_vector_db(), fetch_noaa_alerts(), query_gauges(),
    │           query_gauge_crests(), web_search()
    └─ Autonomously calls tools based on user intent
 
@@ -47,7 +47,7 @@ KY Damage Agent is a real-time situational awareness system built for disaster r
    └─ Vanilla JS single-page app → Flask SSE streaming → word-by-word text + tool-call events
 ```
 
-See `AI agent.drawio.pdf` for the full system diagram.
+See `docs/architecture.pdf` for the full system diagram.
 
 ## Tech Stack
 
@@ -71,57 +71,68 @@ See `AI agent.drawio.pdf` for the full system diagram.
 
 ```
 KY_Damage_Agent/
-├── README.md                      # This file
-├── AI agent.drawio.pdf            # System architecture diagram
-├── TODO.txt                       # Roadmap (three-tier memory, Self-RAG, RAPTOR)
-├── testing.ipynb                  # Jupyter notebook for manual testing
-├── kentucky-260404.osm.pbf        # OpenStreetMap Kentucky data (145 MB)
-├── .env                           # API keys (not in version control)
+├── README.md
+├── LICENSE
+├── pyproject.toml                 # Installable package definition
+├── requirements.txt               # Pinned runtime dependencies
+├── .env.example                   # Template for required API keys
 │
-├── frontend/
-│   └── app.py                     # Flask web server + REST endpoints
+├── src/ky_damage_agent/
+│   ├── paths.py                   # Single source of truth for data/.env paths
+│   │
+│   ├── frontend/
+│   │   ├── app.py                 # Flask web server + REST/SSE endpoints
+│   │   └── templates/
+│   │       └── index.html         # Single-page chat UI (vanilla JS)
+│   │
+│   ├── llm_reasoning/
+│   │   ├── gemini.py              # Core AI agent, system prompt, tool defs, CLI loop
+│   │   └── gemini_chat.py         # Chat factory, message persistence, SSE helpers
+│   │
+│   ├── ingestion/
+│   │   ├── rss.py                 # 8 Kentucky feed catalog + fetcher
+│   │   ├── noaa.py                # NWS alert API client
+│   │   ├── nwps.py                # NOAA gauge data fetcher
+│   │   ├── twitter.py             # Twitter/X disaster tweet crawler
+│   │   └── web_search.py          # Tavily API client
+│   │
+│   ├── processing/
+│   │   ├── normalize_noaa.py      # NOAA alert → dataclass + scoring
+│   │   ├── normalize_rss.py       # RSS entry → dataclass + confidence
+│   │   ├── scoring.py             # Source weights, urgency, composite confidence
+│   │   ├── semantic_filter.py     # SentenceTransformer topic classification
+│   │   ├── geography_filter.py    # spaCy NER + OSM Kentucky relevance
+│   │   └── enrich.py              # Concurrent full-text article fetch
+│   │
+│   ├── memory/
+│   │   ├── database.py            # ChromaDB vector store: embed, upsert, query
+│   │   ├── chat_store.py          # SQLite session/message CRUD
+│   │   ├── gauges.py              # SQLite gauge readings + computed status view
+│   │   └── seed_gauges.py         # One-time seeder: fetch + populate 184 gauges
+│   │
+│   └── schemas/
+│       └── schema.py              # Shared dataclasses
 │
-├── templates/
-│   └── index.html                 # Single-page chat UI (vanilla JS)
+├── docs/
+│   ├── architecture.pdf           # System architecture diagram
+│   └── ROADMAP.md                 # Planned enhancements
 │
-├── llm_reasoning/
-│   ├── Gemini.py                  # Core AI agent, system prompt, tool defs, CLI loop
-│   └── gemini_chat.py             # Chat factory, message persistence, SSE helpers
+├── notebooks/
+│   └── testing.ipynb              # Jupyter notebook for manual testing (not tracked)
 │
-├── ingestion/
-│   ├── RSS.py                     # 8 Kentucky feed catalog + fetcher
-│   ├── noaa.py                    # NWS alert API client
-│   ├── NWPS.py                    # NOAA gauge data fetcher
-│   ├── twitter.py                 # Twitter/X disaster tweet crawler
-│   └── web_search.py              # Tavily API client
-│
-├── processing/
-│   ├── normalize_noaa.py          # NOAA alert → dataclass + scoring
-│   ├── normalize_rss.py           # RSS entry → dataclass + confidence
-│   ├── scoring.py                 # Source weights, urgency, composite confidence
-│   ├── semantic_filter.py         # SentenceTransformer topic classification
-│   ├── geography_filter.py        # spaCy NER + OSM Kentucky relevance
-│   └── enrich.py                  # Concurrent full-text article fetch
-│
-├── memory/
-│   ├── database.py                # ChromaDB vector store: embed, upsert, query
-│   ├── chat_store.py              # SQLite session/message CRUD
-│   ├── gauges.py                  # SQLite gauge readings + computed status view
-│   └── seed_gauges.py             # One-time seeder: fetch + populate 184 gauges
-│
-├── schemas/
-│   └── schema.py                  # Shared dataclasses
-│
-└── database/
-    ├── chat_store.sqlite3         # Persisted chat sessions
-    └── ky_gauges.db               # Gauge readings + crest history
+└── data/                          # Runtime data, not tracked in version control
+    ├── database/
+    │   ├── chat_store.sqlite3     # Persisted chat sessions
+    │   └── ky_gauges.db           # Gauge readings + crest history
+    ├── chroma_db/                 # Persistent vector store
+    └── kentucky-260404.osm.pbf    # OpenStreetMap Kentucky data (145 MB)
 ```
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.10+
 - pip
 - Virtual environment (recommended)
 
@@ -129,6 +140,7 @@ KY_Damage_Agent/
 
 1. **Clone and navigate:**
    ```bash
+   git clone <repo-url>
    cd KY_Damage_Agent
    ```
 
@@ -139,25 +151,32 @@ KY_Damage_Agent/
    # or: venv\Scripts\activate  # Windows
    ```
 
-3. **Install dependencies:**
+3. **Install the package in editable mode:**
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
+   This installs all dependencies (from `requirements.txt`) and registers the `ky-damage-agent` console command. Alternatively, run `pip install -r requirements.txt` without installing the package — in that case use `python -m ky_damage_agent.frontend.app` to start the server (see below).
 
 4. **Download spaCy transformer model:**
    ```bash
    python -m spacy download en_core_web_trf
    ```
 
-5. **Seed the gauge database** (one-time, fetches 184 Kentucky gauges from NWPS API):
+5. **Download the Kentucky OSM extract** and place it at `data/kentucky-260404.osm.pbf` (used by the geography filter for place-name matching).
+
+6. **Seed the gauge database** (one-time, fetches 184 Kentucky gauges from NWPS API):
    ```bash
-   python memory/seed_gauges.py
+   python -m ky_damage_agent.memory.seed_gauges
    ```
-   Note: Requires `BEARER_TOKEN` in `.env` for Twitter API. If you skip this, the `/chat/stream` endpoint will auto-fetch + cache gauge data on first query.
+   Note: If you skip this, the `/chat/stream` endpoint will auto-fetch + cache gauge data on first query.
 
 ### Environment Variables
 
-Create a `.env` file in the project root with the following keys:
+Copy `.env.example` to `.env` in the project root and fill in your keys:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Description |
 |----------|-------------|
@@ -169,23 +188,13 @@ Create a `.env` file in the project root with the following keys:
 | `ACCESS_TOKEN_SECRET` | Twitter access token secret |
 | `BEARER_TOKEN` | Twitter bearer token |
 
-**Example `.env`:**
-```
-GEMINI_API_KEY=your_gemini_key_here
-TAVILY_API_KEY=your_tavily_key_here
-API_KEY=...
-API_KEY_SECRET=...
-ACCESS_TOKEN=...
-ACCESS_TOKEN_SECRET=...
-BEARER_TOKEN=...
-```
-
 ## Running the App
 
 ### Web UI (Flask)
 
 ```bash
-python frontend/app.py
+ky-damage-agent
+# or: python -m ky_damage_agent.frontend.app
 ```
 
 - Opens on `http://localhost:5000`
@@ -199,7 +208,7 @@ python frontend/app.py
 For interactive testing without the web UI:
 
 ```bash
-python llm_reasoning/Gemini.py
+python -m ky_damage_agent.llm_reasoning.gemini
 ```
 
 - Direct conversation loop with the Gemini agent
@@ -265,34 +274,29 @@ error          → {"error": "message"}
 - **Auto-Session Titles:** First user message is truncated to 60 chars and used as session title (no extra Gemini call).
 - **Markdown UI:** Full CommonMark rendering in the browser via marked.js.
 
-## Roadmap (from TODO.txt)
+## Roadmap
 
-- [ ] **Three-Tier Memory:** Short-term (SQLite) → episodic (ChromaDB) → long-term (GraphRAG)
-- [ ] **Reflexion Loop:** Self-evaluation and refinement of Gemini responses
-- [ ] **Structured Output:** Pydantic-based schema enforcement for Gemini replies
-- [ ] **Self-RAG:** Verify claims against knowledge base before returning
-- [ ] **RAPTOR:** Hierarchical summarization of stored signals
-- [ ] **GraphRAG / LightRAG:** Knowledge graph construction for cross-source reasoning
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for planned enhancements (three-tier memory, Self-RAG, RAPTOR, GraphRAG).
 
 ## Development
 
 ### Running Tests
 
-Jupyter notebook (`testing.ipynb`) contains manual test cases for each module.
+Jupyter notebook (`notebooks/testing.ipynb`) contains manual test cases for each module.
 
 ### Modifying Data Sources
 
-Edit `ingestion/RSS.py` to add/remove RSS feeds or change disaster keywords.
+Edit `src/ky_damage_agent/ingestion/rss.py` to add/remove RSS feeds or change disaster keywords.
 
 ### Adjusting Filters
 
-- **Semantic threshold:** `processing/semantic_filter.py` (default 0.40)
-- **Geographic threshold:** `processing/geography_filter.py` (default 0.20)
-- **Source weights:** `processing/scoring.py`
+- **Semantic threshold:** `src/ky_damage_agent/processing/semantic_filter.py` (default 0.40)
+- **Geographic threshold:** `src/ky_damage_agent/processing/geography_filter.py` (default 0.20)
+- **Source weights:** `src/ky_damage_agent/processing/scoring.py`
 
 ## License
 
-Academic project. Refer to project documentation for license details.
+MIT — see [LICENSE](LICENSE).
 
 ## Contact
 

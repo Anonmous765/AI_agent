@@ -5,10 +5,9 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
+from ky_damage_agent.paths import CHAT_STORE_DB as DB_PATH
 
-DB_PATH = Path(__file__).resolve().parent.parent / "database" / "chat_store.sqlite3"
 DEFAULT_SESSION_TITLE = "New Chat"
 
 

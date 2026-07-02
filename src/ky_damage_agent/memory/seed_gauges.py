@@ -3,14 +3,11 @@
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from ky_damage_agent.memory.gauges import _connect, init_db, upsert_gauge, refresh_reading
+from ky_damage_agent.ingestion.nwps import fetch_gauge
+from ky_damage_agent.paths import GAUGES_DB as DB_PATH
 
-from gauges import _connect, init_db, upsert_gauge, refresh_reading
-from ingestion.NWPS import fetch_gauge
-
-DB_PATH = Path(__file__).resolve().parent.parent / "database" / "ky_gauges.db"
 WORKERS = 10
 
 KY_LIDS = [

@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import functools
-import importlib.util
 import queue
-from pathlib import Path
 
-from memory.chat_store import DEFAULT_SESSION_TITLE, add_message_pair
-
-_HERE = Path(__file__).resolve().parent
-_GEMINI_PATH = _HERE / "Gemini.py"
+from ky_damage_agent.llm_reasoning import gemini as gemini_module
+from ky_damage_agent.memory.chat_store import DEFAULT_SESSION_TITLE, add_message_pair
 
 MODEL_NAME = "gemini-3-flash-preview"
 MAX_HISTORY_MESSAGES = 6
@@ -22,18 +18,6 @@ _TOOL_LABELS: dict[str, str] = {
     "query_crests": "Querying historical crest records",
     "web_search": "Searching the web",
 }
-
-
-def _load_gemini_module():
-    spec = importlib.util.spec_from_file_location("disasterai_gemini", _GEMINI_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load Gemini.py from {_GEMINI_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-gemini_module = _load_gemini_module()
 
 
 def derive_session_title(message: str, max_length: int = 60) -> str:

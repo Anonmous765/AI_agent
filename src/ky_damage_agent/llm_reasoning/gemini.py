@@ -7,7 +7,7 @@ This script:
 - Provides a CLI loop for user queries.
 
 Usage:
-    python llm_reasoning/Gemini.py
+    python -m ky_damage_agent.llm_reasoning.gemini
 
 Notes:
     Type "exit" to quit the interactive session.
@@ -26,19 +26,20 @@ import requests
 from rich.console import Console
 from rich.markdown import Markdown
 
-from ingestion.noaa import fetch_raw_alerts
-from ingestion.web_search import web_search
-from memory.gauges import query_gauges, query_crests
-from ingestion.RSS import RSS_FEEDS, fetch_raw_articles
-from processing.normalize_noaa import normalize_noaa_record
-from processing.normalize_rss import normalize_rss_record
-from schemas.schema import NoaaNormalizedSignal, RssNormalizedSignal
-from processing.enrich import enrich_rss_signals
-from memory.database import rss_signal_storage, query_db
-from processing.semantic_filter import classify_article
-from processing.geography_filter import geo_filter
+from ky_damage_agent.ingestion.noaa import fetch_raw_alerts
+from ky_damage_agent.ingestion.web_search import web_search
+from ky_damage_agent.memory.gauges import query_gauges, query_crests
+from ky_damage_agent.ingestion.rss import RSS_FEEDS, fetch_raw_articles
+from ky_damage_agent.processing.normalize_noaa import normalize_noaa_record
+from ky_damage_agent.processing.normalize_rss import normalize_rss_record
+from ky_damage_agent.schemas.schema import NoaaNormalizedSignal, RssNormalizedSignal
+from ky_damage_agent.processing.enrich import enrich_rss_signals
+from ky_damage_agent.memory.database import rss_signal_storage, query_db
+from ky_damage_agent.processing.semantic_filter import classify_article
+from ky_damage_agent.processing.geography_filter import geo_filter
+from ky_damage_agent.paths import ENV_FILE
 
-load_dotenv()
+load_dotenv(dotenv_path=ENV_FILE)
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 

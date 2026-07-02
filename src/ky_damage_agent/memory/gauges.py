@@ -10,9 +10,9 @@ from pathlib import Path
 
 import requests
 
-from ingestion.NWPS import fetch_gauge
+from ky_damage_agent.ingestion.nwps import fetch_gauge
+from ky_damage_agent.paths import GAUGES_DB as DB_PATH
 
-DB_PATH = Path(__file__).resolve().parent.parent / "database" / "ky_gauges.db"
 STALE_READING_THRESHOLD = timedelta(hours=2)
 REFRESH_WORKERS = 10
 REFRESH_STATE_KEY = "last_successful_refresh_at"

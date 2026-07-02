@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from trafilatura import fetch_url, extract
-from schemas.schema import RssNormalizedSignal
+from ky_damage_agent.schemas.schema import RssNormalizedSignal
 
 
 def _enrich_rss_signal(signal: RssNormalizedSignal) -> RssNormalizedSignal:

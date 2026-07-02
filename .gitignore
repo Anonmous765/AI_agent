@@ -3,11 +3,17 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-ingestion/test.ipynb
-testing.ipynb
+
+# Packaging
+*.egg-info/
+build/
+dist/
+.eggs/
 
 # Environment
 .env
+.venv/
+venv/
 
 # IDE
 .idea/
@@ -16,11 +22,9 @@ testing.ipynb
 # Git
 .git/
 
-# Database
-.chroma_db
-database/chat_store.sqlite3
-database/ky_gauges.db
+# Runtime data (databases, vector store, OSM extract — regenerated locally)
+data/
 
-# Local data
-gazetteer/
-kentucky-260404.osm.pbf
+# Notebooks
+notebooks/testing.ipynb
+notebooks/.ipynb_checkpoints/

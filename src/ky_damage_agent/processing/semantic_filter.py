@@ -1,7 +1,7 @@
 from sentence_transformers import SentenceTransformer, util
 import torch
 
-from schemas.schema import RssNormalizedSignal
+from ky_damage_agent.schemas.schema import RssNormalizedSignal
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 

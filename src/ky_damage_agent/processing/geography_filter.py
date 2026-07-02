@@ -1,16 +1,14 @@
 import feedparser
-from pathlib import Path
 
 import spacy
 from pyrosm import OSM
 
-from processing.enrich import enrich_rss_signals
-from processing.normalize_rss import normalize_rss_record
-from schemas.schema import EntityInfo, RssNormalizedSignal
+from ky_damage_agent.processing.enrich import enrich_rss_signals
+from ky_damage_agent.processing.normalize_rss import normalize_rss_record
+from ky_damage_agent.schemas.schema import EntityInfo, RssNormalizedSignal
+from ky_damage_agent.paths import OSM_FILE
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-ky_osm = OSM(str(PROJECT_ROOT / "kentucky-260404.osm.pbf"))
+ky_osm = OSM(str(OSM_FILE))
 _osm_boundaries = ky_osm.get_boundaries()
 _osm_pois = ky_osm.get_pois()
 

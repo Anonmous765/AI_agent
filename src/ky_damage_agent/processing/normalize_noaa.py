@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from schemas.schema import NoaaNormalizedSignal
-from processing.scoring import NOAA_CONFIDENCE
+from ky_damage_agent.schemas.schema import NoaaNormalizedSignal
+from ky_damage_agent.processing.scoring import NOAA_CONFIDENCE
 
 
 def parse_timestamp(ts: str) -> datetime:

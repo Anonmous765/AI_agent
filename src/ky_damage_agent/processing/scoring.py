@@ -1,6 +1,6 @@
 import re
 
-from ingestion.RSS import DISASTER_KEYWORDS
+from ky_damage_agent.ingestion.rss import DISASTER_KEYWORDS
 
 # Source reliability weights
 

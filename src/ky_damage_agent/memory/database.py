@@ -3,20 +3,20 @@ Database operations for storing and querying signals using ChromaDB.
 """
 
 import hashlib
-from pathlib import Path
 from typing import Any, List
 
 import chromadb
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-from schemas.schema import RssNormalizedSignal
-from processing.semantic_filter import classify_article
+from ky_damage_agent.schemas.schema import RssNormalizedSignal
+from ky_damage_agent.processing.semantic_filter import classify_article
+from ky_damage_agent.paths import CHROMA_DIR, ENV_FILE
 
-load_dotenv()
+load_dotenv(dotenv_path=ENV_FILE)
 
 # ChromaDB client
-DB_PATH = Path('.') / '.chroma_db'
+DB_PATH = CHROMA_DIR
 chroma_client = chromadb.PersistentClient(path=str(DB_PATH))
 
 # Embedding model

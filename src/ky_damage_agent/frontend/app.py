@@ -11,7 +11,8 @@ import time
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
-from memory.chat_store import (
+from ky_damage_agent.paths import ENV_FILE
+from ky_damage_agent.memory.chat_store import (
     DEFAULT_SESSION_TITLE,
     create_session,
     delete_session,
@@ -22,9 +23,9 @@ from memory.chat_store import (
     rename_session,
 )
 
-load_dotenv()
+load_dotenv(dotenv_path=ENV_FILE)
 
-from llm_reasoning.gemini_chat import (
+from ky_damage_agent.llm_reasoning.gemini_chat import (
     _chat_response,
     _make_tool_wrapper,
     _save_exchange,
@@ -219,6 +220,11 @@ def chat_stream_route():
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run the Flask development server."""
     # Disable the reloader so the startup pipeline does not run twice in development.
     app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+
+
+if __name__ == "__main__":
+    main()
